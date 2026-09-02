@@ -80,6 +80,11 @@ func (s *Server) setupRoutes() {
 	razorpayXClient := payout.NewRazorpayXClient(s.Config.RazorpayKeyID, s.Config.RazorpayKeySecret, true)
 	githubClient := github.NewGitHubClient(s.Config.GitHubClientID, s.Config.GitHubClientSecret)
 
+	var resolver *payout.Resolver
+	if s.DB != nil && donationRepo != nil && evidenceRepo != nil && verificationRepo != nil && commitmentRepo != nil && charityRepo != nil {
+		resolver = payout.NewResolver(s.DB, razorpayXClient, commitmentRepo, charityRepo, donationRepo, evidenceRepo, verificationRepo)
+	}
+
 	v1 := s.Router.Group("/api/v1")
 	{
 		if userRepo != nil {
@@ -158,8 +163,7 @@ func (s *Server) setupRoutes() {
 					commGroup.POST("/:id/coach", coachHandler.AskCoach)
 				}
 
-				if donationRepo != nil && evidenceRepo != nil && verificationRepo != nil {
-					resolver := payout.NewResolver(s.DB, razorpayXClient, commitmentRepo, charityRepo, donationRepo, evidenceRepo, verificationRepo)
+				if resolver != nil {
 					resolutionHandler := handlers.NewResolutionHandler(resolver, commitmentRepo)
 					commGroup.GET("/:id/status", resolutionHandler.GetCommitmentStatus)
 					commGroup.POST("/:id/check-resolution", resolutionHandler.CheckResolution)
@@ -179,6 +183,17 @@ func (s *Server) setupRoutes() {
 			webhookGroup := v1.Group("/webhooks")
 			{
 				webhookGroup.POST("/razorpay", paymentHandler.HandleRazorpayWebhook)
+			}
+		}
+
+		if s.DB != nil && resolver != nil {
+			devHandler := handlers.NewDevHandler(s.DB, resolver, true)
+			devGroup := v1.Group("/dev")
+			{
+				devGroup.POST("/reset-demo", devHandler.ResetDemo)
+				devGroup.POST("/inject-anomaly", devHandler.InjectAnomaly)
+				devGroup.POST("/force-success", devHandler.ForceSuccess)
+				devGroup.POST("/force-failure", devHandler.ForceFailure)
 			}
 		}
 	}
