@@ -127,6 +127,11 @@ func (s *Server) setupRoutes() {
 			}
 		}
 
+		if commitmentRepo != nil && evidenceRepo != nil && donationRepo != nil && verificationRepo != nil {
+			dashboardHandler := handlers.NewDashboardHandler(commitmentRepo, evidenceRepo, donationRepo, verificationRepo)
+			v1.GET("/dashboard", middleware.AuthRequired(s.Config.JWTSecret), dashboardHandler.GetDashboard)
+		}
+
 		if commitmentRepo != nil && charityRepo != nil {
 			commitmentHandler := handlers.NewCommitmentHandler(commitmentRepo, charityRepo)
 			commGroup := v1.Group("/commitments")
@@ -146,9 +151,11 @@ func (s *Server) setupRoutes() {
 				if evidenceRepo != nil && verificationRepo != nil {
 					progressHandler := handlers.NewProgressHandler(commitmentRepo, evidenceRepo, verificationRepo)
 					verificationHandler := handlers.NewVerificationHandler(groqClient, commitmentRepo, evidenceRepo, verificationRepo)
+					coachHandler := handlers.NewCoachHandler(groqClient, commitmentRepo, evidenceRepo)
 					commGroup.GET("/:id/progress", progressHandler.GetProgress)
 					commGroup.POST("/:id/verify", verificationHandler.VerifyCommitment)
 					commGroup.GET("/:id/verification", verificationHandler.GetLatestVerification)
+					commGroup.POST("/:id/coach", coachHandler.AskCoach)
 				}
 
 				if donationRepo != nil && evidenceRepo != nil && verificationRepo != nil {
