@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/jaiswalshivang/pledgepay/internal/auth"
 	"github.com/jaiswalshivang/pledgepay/internal/config"
 	"github.com/jaiswalshivang/pledgepay/internal/models"
@@ -91,6 +92,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 
 	user := &models.User{
+		ID:             uuid.New().String(),
 		Email:          req.Email,
 		PasswordHash:   string(hashedPassword),
 		Name:           req.Name,

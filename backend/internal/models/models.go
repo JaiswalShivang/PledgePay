@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"time"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type JSONB map[string]interface{}
@@ -41,18 +44,32 @@ type User struct {
 	Commitments  []Commitment  `gorm:"foreignKey:UserID" json:"commitments,omitempty"`
 }
 
+func (u *User) BeforeCreate(tx *gorm.DB) error {
+	if u.ID == "" {
+		u.ID = uuid.New().String()
+	}
+	return nil
+}
+
 type Charity struct {
-	ID                    string    `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
-	Name                  string    `gorm:"type:varchar(255);not null" json:"name"`
-	Category              string    `gorm:"type:varchar(100);not null" json:"category"`
-	Description           string    `gorm:"type:text;not null" json:"description"`
-	LogoURL               *string   `gorm:"type:varchar(500)" json:"logo_url"`
-	WebsiteURL            *string   `gorm:"type:varchar(500);default:'https://giveindia.org'" json:"website_url"`
-	RazorpayxContactID    *string   `gorm:"type:varchar(255);default:'cont_test_charity'" json:"razorpayx_contact_id"`
-	RazorpayxFundAccountID *string  `gorm:"type:varchar(255)" json:"razorpayx_fund_account_id"`
-	IsActive              bool      `gorm:"default:true;not null" json:"is_active"`
-	CreatedAt             time.Time `gorm:"default:now()" json:"created_at"`
-	UpdatedAt             time.Time `gorm:"default:now()" json:"updated_at"`
+	ID                     string    `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	Name                   string    `gorm:"type:varchar(255);not null" json:"name"`
+	Category               string    `gorm:"type:varchar(100);not null" json:"category"`
+	Description            string    `gorm:"type:text;not null" json:"description"`
+	LogoURL                *string   `gorm:"type:varchar(500)" json:"logo_url"`
+	WebsiteURL             *string   `gorm:"type:varchar(500);default:'https://giveindia.org'" json:"website_url"`
+	RazorpayxContactID     *string   `gorm:"type:varchar(255);default:'cont_test_charity'" json:"razorpayx_contact_id"`
+	RazorpayxFundAccountID *string   `gorm:"type:varchar(255)" json:"razorpayx_fund_account_id"`
+	IsActive               bool      `gorm:"default:true;not null" json:"is_active"`
+	CreatedAt              time.Time `gorm:"default:now()" json:"created_at"`
+	UpdatedAt              time.Time `gorm:"default:now()" json:"updated_at"`
+}
+
+func (c *Charity) BeforeCreate(tx *gorm.DB) error {
+	if c.ID == "" {
+		c.ID = uuid.New().String()
+	}
+	return nil
 }
 
 type Commitment struct {
@@ -81,12 +98,26 @@ type Commitment struct {
 	Donation *Donation        `gorm:"foreignKey:CommitmentID" json:"donation,omitempty"`
 }
 
+func (c *Commitment) BeforeCreate(tx *gorm.DB) error {
+	if c.ID == "" {
+		c.ID = uuid.New().String()
+	}
+	return nil
+}
+
 type CommitmentRule struct {
 	ID           string    `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
 	CommitmentID string    `gorm:"type:uuid;not null;index" json:"commitment_id"`
 	RuleType     string    `gorm:"type:varchar(100);not null" json:"rule_type"`
 	RuleConfig   JSONB     `gorm:"type:jsonb;not null" json:"rule_config"`
 	CreatedAt    time.Time `gorm:"default:now()" json:"created_at"`
+}
+
+func (cr *CommitmentRule) BeforeCreate(tx *gorm.DB) error {
+	if cr.ID == "" {
+		cr.ID = uuid.New().String()
+	}
+	return nil
 }
 
 type Integration struct {
@@ -98,6 +129,13 @@ type Integration struct {
 	ConnectedAt      time.Time `gorm:"default:now()" json:"connected_at"`
 }
 
+func (i *Integration) BeforeCreate(tx *gorm.DB) error {
+	if i.ID == "" {
+		i.ID = uuid.New().String()
+	}
+	return nil
+}
+
 type Evidence struct {
 	ID           string    `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
 	CommitmentID string    `gorm:"type:uuid;not null;index" json:"commitment_id"`
@@ -106,6 +144,13 @@ type Evidence struct {
 	RawPayload   JSONB     `gorm:"type:jsonb;not null" json:"raw_payload"`
 	OccurredAt   time.Time `gorm:"not null" json:"occurred_at"`
 	IngestedAt   time.Time `gorm:"default:now()" json:"ingested_at"`
+}
+
+func (e *Evidence) BeforeCreate(tx *gorm.DB) error {
+	if e.ID == "" {
+		e.ID = uuid.New().String()
+	}
+	return nil
 }
 
 type VerificationResult struct {
@@ -121,6 +166,13 @@ type VerificationResult struct {
 	CreatedAt     time.Time `gorm:"default:now()" json:"created_at"`
 }
 
+func (vr *VerificationResult) BeforeCreate(tx *gorm.DB) error {
+	if vr.ID == "" {
+		vr.ID = uuid.New().String()
+	}
+	return nil
+}
+
 type Payment struct {
 	ID                string     `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
 	CommitmentID      string     `gorm:"type:uuid;not null;uniqueIndex" json:"commitment_id"`
@@ -132,7 +184,14 @@ type Payment struct {
 	CreatedAt         time.Time  `gorm:"default:now()" json:"created_at"`
 	UpdatedAt         time.Time  `gorm:"default:now()" json:"updated_at"`
 
-	Refunds           []Refund   `gorm:"foreignKey:PaymentID" json:"refunds,omitempty"`
+	Refunds []Refund `gorm:"foreignKey:PaymentID" json:"refunds,omitempty"`
+}
+
+func (p *Payment) BeforeCreate(tx *gorm.DB) error {
+	if p.ID == "" {
+		p.ID = uuid.New().String()
+	}
+	return nil
 }
 
 type Refund struct {
@@ -142,6 +201,13 @@ type Refund struct {
 	AmountPaise      int64     `gorm:"not null" json:"amount_paise"`
 	Status           string    `gorm:"type:varchar(50);not null;default:'PENDING';index" json:"status"`
 	CreatedAt        time.Time `gorm:"default:now()" json:"created_at"`
+}
+
+func (r *Refund) BeforeCreate(tx *gorm.DB) error {
+	if r.ID == "" {
+		r.ID = uuid.New().String()
+	}
+	return nil
 }
 
 type Donation struct {
@@ -156,7 +222,14 @@ type Donation struct {
 	CreatedAt         time.Time `gorm:"default:now()" json:"created_at"`
 	UpdatedAt         time.Time `gorm:"default:now()" json:"updated_at"`
 
-	Charity           *Charity  `gorm:"foreignKey:CharityID" json:"charity,omitempty"`
+	Charity *Charity `gorm:"foreignKey:CharityID" json:"charity,omitempty"`
+}
+
+func (d *Donation) BeforeCreate(tx *gorm.DB) error {
+	if d.ID == "" {
+		d.ID = uuid.New().String()
+	}
+	return nil
 }
 
 type WebhookEvent struct {
@@ -169,4 +242,11 @@ type WebhookEvent struct {
 	ProcessedError *string   `gorm:"type:text" json:"processed_error"`
 	ReceivedAt     time.Time `gorm:"default:now()" json:"received_at"`
 	CreatedAt      time.Time `gorm:"default:now()" json:"created_at"`
+}
+
+func (we *WebhookEvent) BeforeCreate(tx *gorm.DB) error {
+	if we.ID == "" {
+		we.ID = uuid.New().String()
+	}
+	return nil
 }
