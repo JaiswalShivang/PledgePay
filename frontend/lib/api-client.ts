@@ -188,6 +188,26 @@ export interface Commitment {
   donation?: Donation;
 }
 
+export interface DashboardStats {
+  total_pledged_paise: number;
+  active_commitments_count: number;
+  completed_count: number;
+  total_donated_paise: number;
+  average_progress_pct: number;
+}
+
+export interface DashboardItem {
+  commitment: Commitment;
+  progress: ProgressCalculation;
+  donation?: Donation;
+  verification?: VerificationResult;
+}
+
+export interface DashboardResponse {
+  stats: DashboardStats;
+  items: DashboardItem[];
+}
+
 export interface CreateCommitmentInput {
   title: string;
   description?: string;
@@ -352,6 +372,13 @@ export const apiClient = {
       }),
   },
 
+  dashboard: {
+    get: () =>
+      request<DashboardResponse>("/api/v1/dashboard", {
+        method: "GET",
+      }),
+  },
+
   ai: {
     structureGoal: (text: string) =>
       request<StructuredGoal>("/api/v1/ai/structure-goal", {
@@ -475,6 +502,15 @@ export const apiClient = {
       request<ResolutionResult>(`/api/v1/commitments/${id}/check-resolution`, {
         method: "POST",
       }),
+
+    askCoach: (id: string, question: string) =>
+      request<{ reply: string; progress: ProgressCalculation }>(
+        `/api/v1/commitments/${id}/coach`,
+        {
+          method: "POST",
+          body: JSON.stringify({ question }),
+        }
+      ),
   },
 
   payments: {

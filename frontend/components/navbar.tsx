@@ -30,6 +30,16 @@ export function Navbar() {
           {!isLoading && isAuthenticated && user ? (
             <div className="flex items-center gap-3">
               <Link
+                href="/dashboard"
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                  pathname === "/dashboard"
+                    ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                    : "text-zinc-300 hover:bg-zinc-900 border border-transparent"
+                }`}
+              >
+                <span>Dashboard</span>
+              </Link>
+              <Link
                 href="/commitments/new"
                 className={`glow-emerald flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-zinc-950 transition hover:bg-emerald-400 ${
                   pathname === "/commitments/new" ? "ring-2 ring-emerald-400" : ""

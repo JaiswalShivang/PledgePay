@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState, useEffect } from "react";
+import { use, useState, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { AuthGuard } from "@/components/auth-guard";
@@ -41,6 +41,8 @@ import {
   BrainCircuit,
   Trophy,
   Award,
+  Send,
+  MessageSquare,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -78,6 +80,13 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
+interface CoachMessage {
+  id: string;
+  sender: "user" | "coach";
+  text: string;
+  timestamp: string;
+}
+
 export default function CommitmentDetailPage({ params }: PageProps) {
   const resolvedParams = use(params);
   const commitmentId = resolvedParams.id;
@@ -94,6 +103,18 @@ export default function CommitmentDetailPage({ params }: PageProps) {
   const [isVerifyingAI, setIsVerifyingAI] = useState(false);
   const [isResolving, setIsResolving] = useState(false);
   const [syncSuccessMsg, setSyncSuccessMsg] = useState<string | null>(null);
+
+  const [coachInput, setCoachInput] = useState("");
+  const [isAskingCoach, setIsAskingCoach] = useState(false);
+  const msgCounter = useRef(1);
+  const [coachMessages, setCoachMessages] = useState<CoachMessage[]>([
+    {
+      id: "welcome",
+      sender: "coach",
+      text: "Hello! I am your AI Commitment Coach. I monitor your progress against mathematical rule evaluations to help you stay on track and protect your pledge.",
+      timestamp: "Today",
+    },
+  ]);
 
   useEffect(() => {
     if (typeof window !== "undefined" && !document.getElementById("razorpay-checkout-script")) {
@@ -239,6 +260,46 @@ export default function CommitmentDetailPage({ params }: PageProps) {
       setErrorMessage(msg);
     } finally {
       setIsResolving(false);
+    }
+  };
+
+  const handleAskCoach = async (questionToAsk?: string) => {
+    const q = questionToAsk || coachInput;
+    if (!q.trim()) return;
+
+    const userMsg: CoachMessage = {
+      id: `user_msg_${msgCounter.current++}`,
+      sender: "user",
+      text: q.trim(),
+      timestamp: "Just now",
+    };
+
+    setCoachMessages((prev) => [...prev, userMsg]);
+    setCoachInput("");
+    setIsAskingCoach(true);
+
+    try {
+      const res = await apiClient.commitments.askCoach(commitmentId, q.trim());
+      const coachMsg: CoachMessage = {
+        id: `coach_msg_${msgCounter.current++}`,
+        sender: "coach",
+        text: res.reply,
+        timestamp: "Just now",
+      };
+      setCoachMessages((prev) => [...prev, coachMsg]);
+      if (res.progress) {
+        queryClient.setQueryData(["progress", commitmentId], res.progress);
+      }
+    } catch {
+      const errorMsg: CoachMessage = {
+        id: `coach_err_${msgCounter.current++}`,
+        sender: "coach",
+        text: "I am having trouble computing coach insights right now. Please verify your connection or try again in a moment.",
+        timestamp: "Just now",
+      };
+      setCoachMessages((prev) => [...prev, errorMsg]);
+    } finally {
+      setIsAskingCoach(false);
     }
   };
 
@@ -398,11 +459,11 @@ export default function CommitmentDetailPage({ params }: PageProps) {
       <div className="container mx-auto max-w-4xl px-4 py-10">
         <div className="mb-6">
           <Link
-            href="/commitments/new"
+            href="/dashboard"
             className="inline-flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition mb-3"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
-            <span>Create another commitment</span>
+            <span>Back to Dashboard</span>
           </Link>
 
           {isLoading ? (
@@ -757,6 +818,105 @@ export default function CommitmentDetailPage({ params }: PageProps) {
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {commitment.status === "ACTIVE" && (
+                <div className="glass-panel rounded-2xl border border-white/10 p-6 space-y-4">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400">
+                        <MessageSquare className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                          <span>AI Commitment Coach (AI #4)</span>
+                          <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                        </h3>
+                        <p className="text-[11px] text-zinc-400">
+                          Grounded conversational assistance trained on your real mathematical pace.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                    {coachMessages.map((msg) => (
+                      <div
+                        key={msg.id}
+                        className={`flex gap-2.5 ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
+                      >
+                        {msg.sender === "coach" && (
+                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400 mt-1">
+                            <Bot className="h-3.5 w-3.5" />
+                          </div>
+                        )}
+                        <div
+                          className={`max-w-md rounded-2xl p-3.5 text-xs leading-relaxed ${
+                            msg.sender === "user"
+                              ? "bg-emerald-500 text-zinc-950 font-semibold"
+                              : "bg-zinc-900 border border-white/5 text-zinc-200"
+                          }`}
+                        >
+                          <div className="whitespace-pre-line">{msg.text}</div>
+                          <div
+                            className={`text-[9px] mt-1 text-right font-mono ${
+                              msg.sender === "user" ? "text-zinc-800" : "text-zinc-500"
+                            }`}
+                          >
+                            {msg.timestamp}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {isAskingCoach && (
+                      <div className="flex items-center gap-2 text-xs text-zinc-400 p-2">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400" />
+                        <span>AI Coach analyzing your mathematical pace...</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {[
+                      "How is my daily pace?",
+                      "Can I still make the deadline?",
+                      "Give me a 3-day recovery plan",
+                      "What happens if I miss the goal?",
+                    ].map((promptText) => (
+                      <button
+                        key={promptText}
+                        onClick={() => handleAskCoach(promptText)}
+                        disabled={isAskingCoach}
+                        className="rounded-lg border border-white/5 bg-zinc-900/60 px-2.5 py-1 text-[11px] text-zinc-400 hover:text-white hover:bg-zinc-800 transition disabled:opacity-40"
+                      >
+                        {promptText}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      type="text"
+                      value={coachInput}
+                      onChange={(e) => setCoachInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          handleAskCoach();
+                        }
+                      }}
+                      placeholder="Ask your coach anything about your progress or pace..."
+                      className="w-full rounded-xl border border-white/10 bg-zinc-900 p-3 text-xs text-white placeholder-zinc-500 outline-none focus:border-emerald-500"
+                    />
+                    <button
+                      onClick={() => handleAskCoach()}
+                      disabled={isAskingCoach || !coachInput.trim()}
+                      className="flex shrink-0 items-center justify-center rounded-xl bg-emerald-500 p-3 text-zinc-950 font-bold hover:bg-emerald-400 transition disabled:opacity-40"
+                    >
+                      <Send className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               )}
 
