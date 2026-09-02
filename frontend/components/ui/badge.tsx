@@ -3,29 +3,29 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const badgeVariants = cva(
-  "inline-flex items-center gap-1.5 font-medium transition-colors select-none",
+  "inline-flex items-center gap-1 font-medium transition-colors select-none",
   {
     variants: {
       variant: {
         default:
-          "bg-[#151D2C] text-[#94A3B8] border border-[#25334C]",
+          "bg-[#F1F3F5] text-[#52525B] border border-[#E4E7EB]",
         active:
-          "bg-[#10B981]/10 text-[#34D399] border border-[#10B981]/30",
+          "bg-[#ECFDF5] text-[#065F46] border border-[#A7F3D0]",
         completed:
-          "bg-[#10B981]/15 text-[#34D399] border border-[#10B981]/40 font-semibold",
+          "bg-[#ECFDF5] text-[#047857] border border-[#A7F3D0]",
         failed:
-          "bg-red-500/10 text-red-400 border border-red-500/30",
+          "bg-[#FEF2F2] text-[#B91C1C] border border-[#FECACA]",
         pending:
-          "bg-[#F59E0B]/10 text-[#FBBF24] border border-[#F59E0B]/30",
+          "bg-[#FFFBEB] text-[#B45309] border border-[#FDE68A]",
         impact:
-          "bg-[#E07A5F]/15 text-[#F4A261] border border-[#E07A5F]/35 font-semibold",
+          "bg-[#FFF7ED] text-[#C2410C] border border-[#FED7AA]",
         info:
-          "bg-blue-500/10 text-blue-400 border border-blue-500/30",
+          "bg-[#EFF6FF] text-[#1D4ED8] border border-[#BFDBFE]",
       },
       size: {
-        sm: "px-2 py-0.5 text-[11px] rounded-[5px]",
-        md: "px-2.5 py-1 text-xs rounded-[6px]",
-        lg: "px-3 py-1.5 text-sm rounded-[8px]",
+        sm: "px-2 py-0.5 text-[11px] rounded-[4px]",
+        md: "px-2.5 py-0.5 text-xs rounded-[6px]",
+        lg: "px-3 py-1 text-sm rounded-[6px]",
       },
     },
     defaultVariants: {

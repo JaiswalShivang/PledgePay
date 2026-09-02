@@ -25,27 +25,27 @@ export function ProgressBar({
   const percentage = Math.min(100, Math.max(0, (value / max) * 100));
 
   const statusColors = {
-    default: "bg-[#10B981]",
-    on_track: "bg-[#10B981]",
-    at_risk: "bg-[#F59E0B]",
-    behind: "bg-[#EF4444]",
-    completed: "bg-[#10B981]",
-    failed: "bg-[#E07A5F]",
+    default: "bg-[#047857]",
+    on_track: "bg-[#047857]",
+    at_risk: "bg-[#D97706]",
+    behind: "bg-[#DC2626]",
+    completed: "bg-[#047857]",
+    failed: "bg-[#DC2626]",
   };
 
   const heightClasses = {
     sm: "h-1.5",
-    md: "h-2.5",
-    lg: "h-4",
+    md: "h-2",
+    lg: "h-3",
   };
 
   return (
-    <div className={cn("w-full space-y-1.5", className)} {...props}>
+    <div className={cn("w-full space-y-1", className)} {...props}>
       {(label || showValue) && (
-        <div className="flex items-center justify-between text-xs text-[#94A3B8]">
-          <span className="font-medium text-[#F1F5F9]">{label}</span>
+        <div className="flex items-center justify-between text-xs text-[#52525B]">
+          <span className="font-medium text-[#18181B]">{label}</span>
           {showValue && (
-            <span className="font-numeric font-semibold text-[#F1F5F9]">
+            <span className="font-numeric font-medium text-[#18181B]">
               {Math.round(percentage)}%
             </span>
           )}
@@ -53,20 +53,20 @@ export function ProgressBar({
       )}
       <div
         className={cn(
-          "w-full rounded-full bg-[#070A0F] border border-[#1C273A] overflow-hidden p-[1px]",
+          "w-full rounded-full bg-[#E5E7EB] overflow-hidden",
           heightClasses[size]
         )}
       >
         <div
           className={cn(
-            "h-full rounded-full transition-all duration-500 ease-out",
+            "h-full rounded-full transition-all duration-300 ease-out",
             statusColors[status]
           )}
           style={{ width: `${percentage}%` }}
         />
       </div>
       {subLabel && (
-        <div className="text-[11px] text-[#64748B] font-numeric">{subLabel}</div>
+        <div className="text-[11px] text-[#71717A] font-numeric">{subLabel}</div>
       )}
     </div>
   );
