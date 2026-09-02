@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jaiswalshivang/pledgepay/internal/ai"
 	"github.com/jaiswalshivang/pledgepay/internal/config"
+	"github.com/jaiswalshivang/pledgepay/internal/github"
 	"github.com/jaiswalshivang/pledgepay/internal/handlers"
 	"github.com/jaiswalshivang/pledgepay/internal/middleware"
 	"github.com/jaiswalshivang/pledgepay/internal/payment"
@@ -55,6 +56,8 @@ func (s *Server) setupRoutes() {
 	var charityRepo repository.CharityRepository
 	var commitmentRepo repository.CommitmentRepository
 	var paymentRepo repository.PaymentRepository
+	var integrationRepo repository.IntegrationRepository
+	var evidenceRepo repository.EvidenceRepository
 	var webhookRepo repository.WebhookRepository
 
 	if s.DB != nil {
@@ -62,11 +65,14 @@ func (s *Server) setupRoutes() {
 		charityRepo = repository.NewCharityRepository(s.DB)
 		commitmentRepo = repository.NewCommitmentRepository(s.DB)
 		paymentRepo = repository.NewPaymentRepository(s.DB)
+		integrationRepo = repository.NewIntegrationRepository(s.DB)
+		evidenceRepo = repository.NewEvidenceRepository(s.DB)
 		webhookRepo = repository.NewWebhookRepository(s.DB)
 	}
 
 	groqClient := ai.NewGroqClient(s.Config.GroqAPIKey, s.Config.GroqModel)
 	razorpayClient := payment.NewRazorpayClient(s.Config.RazorpayKeyID, s.Config.RazorpayKeySecret)
+	githubClient := github.NewGitHubClient(s.Config.GitHubClientID, s.Config.GitHubClientSecret)
 
 	v1 := s.Router.Group("/api/v1")
 	{
@@ -102,6 +108,19 @@ func (s *Server) setupRoutes() {
 			})
 		}
 
+		if integrationRepo != nil && userRepo != nil && commitmentRepo != nil && evidenceRepo != nil {
+			integrationHandler := handlers.NewIntegrationHandler(s.Config, githubClient, integrationRepo, userRepo, commitmentRepo, evidenceRepo)
+
+			v1.GET("/integrations/github/callback", integrationHandler.GitHubCallback)
+
+			intGroup := v1.Group("/integrations")
+			intGroup.Use(middleware.AuthRequired(s.Config.JWTSecret))
+			{
+				intGroup.GET("/github/connect", integrationHandler.ConnectGitHub)
+				intGroup.GET("/github/repos", integrationHandler.ListUserRepos)
+			}
+		}
+
 		if commitmentRepo != nil && charityRepo != nil {
 			commitmentHandler := handlers.NewCommitmentHandler(commitmentRepo, charityRepo)
 			commGroup := v1.Group("/commitments")
@@ -110,6 +129,13 @@ func (s *Server) setupRoutes() {
 				commGroup.POST("", commitmentHandler.CreateCommitment)
 				commGroup.GET("", commitmentHandler.ListMyCommitments)
 				commGroup.GET("/:id", commitmentHandler.GetCommitmentByID)
+
+				if integrationRepo != nil && userRepo != nil && evidenceRepo != nil {
+					integrationHandler := handlers.NewIntegrationHandler(s.Config, githubClient, integrationRepo, userRepo, commitmentRepo, evidenceRepo)
+					commGroup.POST("/:id/link-repo", integrationHandler.LinkRepo)
+					commGroup.POST("/:id/sync-evidence", integrationHandler.SyncEvidence)
+					commGroup.GET("/:id/evidence", integrationHandler.GetCommitmentEvidence)
+				}
 			}
 		}
 

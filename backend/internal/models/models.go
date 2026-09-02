@@ -75,6 +75,7 @@ type Commitment struct {
 	ID           string    `gorm:"type:uuid;primaryKey" json:"id"`
 	UserID       string    `gorm:"type:uuid;not null;index" json:"user_id"`
 	CharityID    *string   `gorm:"type:uuid;index" json:"charity_id,omitempty"`
+	GithubRepo   *string   `gorm:"type:varchar(255);index" json:"github_repo,omitempty"`
 	Title        string    `gorm:"type:varchar(255);not null" json:"title"`
 	Description  *string   `gorm:"type:text" json:"description,omitempty"`
 	TargetCount  int       `gorm:"not null" json:"target_count"`
