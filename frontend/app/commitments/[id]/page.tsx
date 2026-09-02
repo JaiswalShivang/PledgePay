@@ -10,6 +10,7 @@ import {
   EvidenceItem,
   GitHubRepoItem,
   ProgressCalculation,
+  VerificationResult,
 } from "@/lib/api-client";
 import {
   Calendar,
@@ -35,6 +36,8 @@ import {
   Target,
   TrendingUp,
   AlertTriangle,
+  Bot,
+  BrainCircuit,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -85,6 +88,7 @@ export default function CommitmentDetailPage({ params }: PageProps) {
   const [selectedRepo, setSelectedRepo] = useState<string>("");
   const [isLinkingRepo, setIsLinkingRepo] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isVerifyingAI, setIsVerifyingAI] = useState(false);
   const [syncSuccessMsg, setSyncSuccessMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -139,6 +143,15 @@ export default function CommitmentDetailPage({ params }: PageProps) {
     enabled: !!commitment && commitment.status === "ACTIVE",
   });
 
+  const { data: verificationData, refetch: refetchVerification } = useQuery<VerificationResult | null>({
+    queryKey: ["verification", commitmentId],
+    queryFn: async () => {
+      const res = await apiClient.commitments.getVerification(commitmentId);
+      return res.verification;
+    },
+    enabled: !!commitment && commitment.status === "ACTIVE",
+  });
+
   const activeRepo =
     selectedRepo ||
     commitment?.github_repo ||
@@ -167,6 +180,7 @@ export default function CommitmentDetailPage({ params }: PageProps) {
       const res = await apiClient.commitments.syncEvidence(commitmentId);
       refetchEvidence();
       refetchProgress();
+      refetchVerification();
       refetch();
       setSyncSuccessMsg(`Successfully synced ${res.synced_count} evidence items.`);
       setTimeout(() => setSyncSuccessMsg(null), 4000);
@@ -175,6 +189,24 @@ export default function CommitmentDetailPage({ params }: PageProps) {
       setErrorMessage(msg);
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  const handleVerifyAI = async () => {
+    setIsVerifyingAI(true);
+    setErrorMessage(null);
+    try {
+      const res = await apiClient.commitments.verify(commitmentId);
+      queryClient.setQueryData(["progress", commitmentId], res.progress);
+      queryClient.setQueryData(["verification", commitmentId], res.verification);
+      refetchProgress();
+      refetchVerification();
+      refetch();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to execute AI verification";
+      setErrorMessage(msg);
+    } finally {
+      setIsVerifyingAI(false);
     }
   };
 
@@ -214,6 +246,7 @@ export default function CommitmentDetailPage({ params }: PageProps) {
               setPaymentStep("success");
               refetch();
               refetchProgress();
+              refetchVerification();
             } catch (vErr: unknown) {
               const msg =
                 vErr instanceof Error ? vErr.message : "Payment signature verification failed";
@@ -249,6 +282,7 @@ export default function CommitmentDetailPage({ params }: PageProps) {
         setPaymentStep("success");
         refetch();
         refetchProgress();
+        refetchVerification();
       }
     } catch (err: unknown) {
       const msg =
@@ -382,6 +416,26 @@ export default function CommitmentDetailPage({ params }: PageProps) {
                 </div>
               )}
 
+              {verificationData && verificationData.anomaly_flag && (
+                <div className="glass-panel rounded-2xl border border-amber-500/40 bg-amber-500/10 p-5 flex items-start gap-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                    <AlertTriangle className="h-6 w-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-sm font-bold text-amber-300">
+                      <span>Potential Anomaly Detected in Evidence Stream</span>
+                      <span className="rounded-md bg-amber-500/20 px-2 py-0.5 text-[10px] font-mono uppercase text-amber-300 border border-amber-500/30">
+                        FLAGGED
+                      </span>
+                    </div>
+                    <p className="text-xs text-amber-200/90 leading-relaxed">
+                      {verificationData.anomaly_reason ||
+                        "Unusual timing pattern or cluster burst detected during automated evidence inspection."}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2 mb-1.5">
@@ -422,7 +476,7 @@ export default function CommitmentDetailPage({ params }: PageProps) {
                       <div className="flex items-center gap-2">
                         <h3 className="text-base font-bold text-white flex items-center gap-2">
                           <Target className="h-4 w-4 text-emerald-400" />
-                          <span>Deterministic Progress Engine</span>
+                          <span>Progress & AI Verification Engine</span>
                         </h3>
                         {(() => {
                           const badge = getPaceStatusBadge(progressData.status);
@@ -435,14 +489,33 @@ export default function CommitmentDetailPage({ params }: PageProps) {
                             </span>
                           );
                         })()}
+                        {verificationData?.ai_summary?.evidence_quality && (
+                          <span className="flex items-center gap-1 rounded-md border border-teal-500/30 bg-teal-500/10 px-2 py-0.5 text-[10px] font-mono font-bold text-teal-300">
+                            <Bot className="h-3 w-3" />
+                            <span>{verificationData.ai_summary.evidence_quality} QUALITY</span>
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-zinc-400 mt-0.5">
-                        Mathematical evaluation: {progressData.verified} / {progressData.target} {commitment.unit} verified against rules.
+                        Mathematical evaluation: {progressData.verified} / {progressData.target} {commitment.unit} verified.
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-4 text-right">
-                      <div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={handleVerifyAI}
+                        disabled={isVerifyingAI}
+                        className="flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/20 transition disabled:opacity-50"
+                      >
+                        {isVerifyingAI ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <BrainCircuit className="h-3.5 w-3.5 text-emerald-400" />
+                        )}
+                        <span>{isVerifyingAI ? "Analyzing AI..." : "Run AI Verification"}</span>
+                      </button>
+
+                      <div className="text-right">
                         <div className="text-[10px] uppercase text-zinc-500 font-mono">Completion</div>
                         <div className="text-2xl font-black text-emerald-400 font-mono">
                           {progressData.progress_pct}%
@@ -491,12 +564,28 @@ export default function CommitmentDetailPage({ params }: PageProps) {
                     </div>
 
                     <div className="rounded-xl bg-zinc-900/60 p-3 border border-white/5">
-                      <div className="text-[10px] uppercase text-zinc-400 font-mono">Required Pace</div>
+                      <div className="text-[10px] uppercase text-zinc-400 font-mono">
+                        {verificationData?.ai_confidence
+                          ? `AI Confidence (${verificationData.ai_confidence}%)`
+                          : "Required Pace"}
+                      </div>
                       <div className="text-base font-bold text-zinc-300 font-mono mt-0.5">
-                        {progressData.daily_pace_required} <span className="text-xs font-normal text-zinc-500">/day</span>
+                        {verificationData?.ai_confidence
+                          ? `${verificationData.ai_confidence}%`
+                          : `${progressData.daily_pace_required}/day`}
                       </div>
                     </div>
                   </div>
+
+                  {verificationData?.ai_summary?.summary && (
+                    <div className="rounded-xl bg-zinc-900/80 p-3.5 border border-white/5 text-xs text-zinc-300 flex items-start gap-2.5">
+                      <Bot className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-semibold text-white">AI Evidence Assessment: </span>
+                        <span>{verificationData.ai_summary.summary}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

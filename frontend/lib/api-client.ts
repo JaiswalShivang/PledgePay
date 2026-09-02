@@ -124,6 +124,23 @@ export interface ProgressCalculation {
   daily_pace_required: number;
 }
 
+export interface VerificationResult {
+  id: string;
+  commitment_id: string;
+  evidence_count: number;
+  verified_count: number;
+  progress_pct: number;
+  anomaly_flag: boolean;
+  anomaly_reason?: string;
+  ai_confidence?: number;
+  ai_summary?: {
+    evidence_quality?: "HIGH" | "MEDIUM" | "LOW";
+    anomaly?: string;
+    summary?: string;
+  };
+  created_at: string;
+}
+
 export interface Commitment {
   id: string;
   user_id: string;
@@ -404,6 +421,22 @@ export const apiClient = {
     getProgress: (id: string) =>
       request<{ progress: ProgressCalculation }>(
         `/api/v1/commitments/${id}/progress`,
+        {
+          method: "GET",
+        }
+      ),
+
+    verify: (id: string) =>
+      request<{
+        progress: ProgressCalculation;
+        verification: VerificationResult;
+      }>(`/api/v1/commitments/${id}/verify`, {
+        method: "POST",
+      }),
+
+    getVerification: (id: string) =>
+      request<{ verification: VerificationResult | null }>(
+        `/api/v1/commitments/${id}/verification`,
         {
           method: "GET",
         }
