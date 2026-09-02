@@ -43,6 +43,46 @@ export interface LoginInput {
   password: string;
 }
 
+export interface Charity {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  logo_url?: string;
+  is_active: boolean;
+  razorpayx_fund_account_id?: string;
+}
+
+export interface StructuredGoal {
+  goal: string;
+  target: number;
+  duration: number;
+  unit: string;
+  evidence: string;
+}
+
+export interface QualityAnalysis {
+  specificity: number;
+  measurability: number;
+  realism: number;
+  evidence: number;
+  overall: number;
+  issues: string[];
+  suggested_commitment: StructuredGoal;
+}
+
+export interface CharitySuggestion {
+  charity_id: string;
+  charity?: Charity;
+  rationale: string;
+}
+
+export interface AnalyzeCombinedResponse {
+  structured: StructuredGoal;
+  quality: QualityAnalysis;
+  charities: CharitySuggestion[];
+}
+
 export class ApiError extends Error {
   status: number;
   data: unknown;
@@ -164,6 +204,53 @@ export const apiClient = {
 
     getMe: () =>
       request<{ user: User }>("/api/v1/me", {
+        method: "GET",
+      }),
+  },
+
+  ai: {
+    structureGoal: (text: string) =>
+      request<StructuredGoal>("/api/v1/ai/structure-goal", {
+        method: "POST",
+        body: JSON.stringify({ text }),
+      }),
+
+    analyzeQuality: (params: {
+      text: string;
+      goal?: string;
+      target?: number;
+      duration?: number;
+      unit?: string;
+      evidence?: string;
+    }) =>
+      request<QualityAnalysis>("/api/v1/ai/analyze-quality", {
+        method: "POST",
+        body: JSON.stringify(params),
+      }),
+
+    suggestCharities: (params: {
+      goal: string;
+      category?: string;
+      evidence_type?: string;
+    }) =>
+      request<{ suggestions: CharitySuggestion[] }>(
+        "/api/v1/ai/suggest-charities",
+        {
+          method: "POST",
+          body: JSON.stringify(params),
+        }
+      ),
+
+    analyzeCombined: (text: string) =>
+      request<AnalyzeCombinedResponse>("/api/v1/ai/analyze-combined", {
+        method: "POST",
+        body: JSON.stringify({ text }),
+      }),
+  },
+
+  charities: {
+    list: () =>
+      request<{ charities: Charity[] }>("/api/v1/charities", {
         method: "GET",
       }),
   },
