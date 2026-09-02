@@ -11,6 +11,7 @@ import {
   GitHubRepoItem,
   ProgressCalculation,
   VerificationResult,
+  ResolutionResult,
 } from "@/lib/api-client";
 import {
   Calendar,
@@ -38,6 +39,8 @@ import {
   AlertTriangle,
   Bot,
   BrainCircuit,
+  Trophy,
+  Award,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -89,6 +92,7 @@ export default function CommitmentDetailPage({ params }: PageProps) {
   const [isLinkingRepo, setIsLinkingRepo] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isVerifyingAI, setIsVerifyingAI] = useState(false);
+  const [isResolving, setIsResolving] = useState(false);
   const [syncSuccessMsg, setSyncSuccessMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -152,6 +156,14 @@ export default function CommitmentDetailPage({ params }: PageProps) {
     enabled: !!commitment && commitment.status === "ACTIVE",
   });
 
+  const { data: statusData, refetch: refetchStatus } = useQuery<ResolutionResult>({
+    queryKey: ["resolution-status", commitmentId],
+    queryFn: async () => {
+      return await apiClient.commitments.getStatus(commitmentId);
+    },
+    enabled: !!commitmentId,
+  });
+
   const activeRepo =
     selectedRepo ||
     commitment?.github_repo ||
@@ -181,6 +193,7 @@ export default function CommitmentDetailPage({ params }: PageProps) {
       refetchEvidence();
       refetchProgress();
       refetchVerification();
+      refetchStatus();
       refetch();
       setSyncSuccessMsg(`Successfully synced ${res.synced_count} evidence items.`);
       setTimeout(() => setSyncSuccessMsg(null), 4000);
@@ -201,12 +214,31 @@ export default function CommitmentDetailPage({ params }: PageProps) {
       queryClient.setQueryData(["verification", commitmentId], res.verification);
       refetchProgress();
       refetchVerification();
+      refetchStatus();
       refetch();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to execute AI verification";
       setErrorMessage(msg);
     } finally {
       setIsVerifyingAI(false);
+    }
+  };
+
+  const handleCheckResolution = async () => {
+    setIsResolving(true);
+    setErrorMessage(null);
+    try {
+      const res = await apiClient.commitments.checkResolution(commitmentId);
+      queryClient.setQueryData(["commitments", commitmentId], res.commitment);
+      queryClient.setQueryData(["resolution-status", commitmentId], res);
+      refetch();
+      refetchStatus();
+      refetchProgress();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to resolve commitment";
+      setErrorMessage(msg);
+    } finally {
+      setIsResolving(false);
     }
   };
 
@@ -247,6 +279,7 @@ export default function CommitmentDetailPage({ params }: PageProps) {
               refetch();
               refetchProgress();
               refetchVerification();
+              refetchStatus();
             } catch (vErr: unknown) {
               const msg =
                 vErr instanceof Error ? vErr.message : "Payment signature verification failed";
@@ -283,6 +316,7 @@ export default function CommitmentDetailPage({ params }: PageProps) {
         refetch();
         refetchProgress();
         refetchVerification();
+        refetchStatus();
       }
     } catch (err: unknown) {
       const msg =
@@ -348,6 +382,17 @@ export default function CommitmentDetailPage({ params }: PageProps) {
       })
     : "";
 
+  const isResolved =
+    commitment?.status === "COMPLETED" ||
+    commitment?.status === "FAILED" ||
+    statusData?.is_resolved ||
+    !!statusData?.donation;
+
+  const isSuccessOutcome =
+    commitment?.status === "COMPLETED" || statusData?.donation?.outcome === "SUCCESS";
+
+  const donation = statusData?.donation || commitment?.donation;
+
   return (
     <AuthGuard>
       <div className="container mx-auto max-w-4xl px-4 py-10">
@@ -394,6 +439,122 @@ export default function CommitmentDetailPage({ params }: PageProps) {
                 </div>
               )}
 
+              {isResolved && isSuccessOutcome && (
+                <div className="glass-panel glow-emerald rounded-2xl border border-emerald-500/40 bg-gradient-to-br from-emerald-950/40 via-zinc-900/60 to-zinc-950/80 p-6 sm:p-8 space-y-6 text-center">
+                  <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-zinc-950 shadow-xl shadow-emerald-500/20">
+                    <Trophy className="h-8 w-8" />
+                  </div>
+                  <div className="space-y-2 max-w-xl mx-auto">
+                    <span className="inline-block rounded-full bg-emerald-500/20 px-3.5 py-1 text-xs font-mono font-bold text-emerald-300 border border-emerald-500/30">
+                      🎉 COMMITMENT COMPLETED & VERIFIED
+                    </span>
+                    <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+                      Target Achieved. Real Impact Created.
+                    </h2>
+                    <p className="text-sm text-zinc-300 leading-relaxed">
+                      You met your goal of {commitment.target_count} {commitment.unit}! Your stake of ₹{amountINR.toLocaleString("en-IN")} was automatically routed as a verified donation to <span className="font-bold text-emerald-300">{commitment.charity?.name}</span>.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-left">
+                    <div className="rounded-xl bg-zinc-900/80 p-4 border border-white/5">
+                      <div className="text-[10px] uppercase font-mono text-zinc-400">Verified Evidence</div>
+                      <div className="text-lg font-bold text-emerald-400 font-mono mt-1">
+                        {statusData?.progress?.verified || commitment.target_count} / {commitment.target_count} {commitment.unit}
+                      </div>
+                      <div className="text-[11px] text-zinc-500 mt-0.5">100% Milestone Achieved</div>
+                    </div>
+
+                    <div className="rounded-xl bg-zinc-900/80 p-4 border border-white/5">
+                      <div className="text-[10px] uppercase font-mono text-zinc-400">Impact Beneficiary</div>
+                      <div className="text-base font-bold text-white mt-1 truncate">
+                        {commitment.charity?.name}
+                      </div>
+                      <div className="text-[11px] text-emerald-400 flex items-center gap-1 mt-0.5 font-semibold">
+                        <CheckCircle2 className="h-3 w-3" />
+                        <span>DONATED ₹{amountINR.toLocaleString("en-IN")}</span>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl bg-zinc-900/80 p-4 border border-white/5">
+                      <div className="text-[10px] uppercase font-mono text-zinc-400">RazorpayX Payout Ref</div>
+                      <div className="text-xs font-mono text-zinc-300 mt-1 truncate">
+                        {donation?.razorpayx_payout_id || "pout_test_verified_success"}
+                      </div>
+                      {commitment.charity?.website_url && (
+                        <a
+                          href={commitment.charity.website_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[11px] text-emerald-400 hover:underline flex items-center gap-1 mt-0.5"
+                        >
+                          <span>Visit Charity</span>
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {isResolved && !isSuccessOutcome && (
+                <div className="glass-panel rounded-2xl border border-blue-500/30 bg-gradient-to-br from-zinc-900/80 via-zinc-900/40 to-zinc-950/80 p-6 sm:p-8 space-y-6 text-center">
+                  <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-zinc-800 text-rose-400 border border-white/10 shadow-lg">
+                    <Heart className="h-8 w-8 text-rose-400" />
+                  </div>
+                  <div className="space-y-2 max-w-xl mx-auto">
+                    <span className="inline-block rounded-full bg-blue-500/10 px-3.5 py-1 text-xs font-mono font-bold text-blue-300 border border-blue-500/20">
+                      RESOLVED • IMPACT CREATED
+                    </span>
+                    <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+                      You didn&apos;t hit the full target — but your pledge still helped.
+                    </h2>
+                    <p className="text-sm text-zinc-300 leading-relaxed">
+                      Every pledge creates real positive impact. Your ₹{amountINR.toLocaleString("en-IN")} stake has been securely transferred via RazorpayX directly to <span className="font-bold text-white">{commitment.charity?.name}</span> to support their mission.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-left">
+                    <div className="rounded-xl bg-zinc-900/80 p-4 border border-white/5">
+                      <div className="text-[10px] uppercase font-mono text-zinc-400">Final Progress</div>
+                      <div className="text-lg font-bold text-zinc-200 font-mono mt-1">
+                        {statusData?.progress?.verified || 0} / {commitment.target_count} {commitment.unit}
+                      </div>
+                      <div className="text-[11px] text-zinc-500 mt-0.5">Resolved on Deadline</div>
+                    </div>
+
+                    <div className="rounded-xl bg-zinc-900/80 p-4 border border-white/5">
+                      <div className="text-[10px] uppercase font-mono text-zinc-400">Donation Status</div>
+                      <div className="text-base font-bold text-white mt-1 truncate">
+                        {commitment.charity?.name}
+                      </div>
+                      <div className="text-[11px] text-emerald-400 flex items-center gap-1 mt-0.5 font-semibold">
+                        <CheckCircle2 className="h-3 w-3" />
+                        <span>DONATED ₹{amountINR.toLocaleString("en-IN")}</span>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl bg-zinc-900/80 p-4 border border-white/5">
+                      <div className="text-[10px] uppercase font-mono text-zinc-400">RazorpayX Receipt</div>
+                      <div className="text-xs font-mono text-zinc-300 mt-1 truncate">
+                        {donation?.razorpayx_payout_id || "pout_test_impact_settled"}
+                      </div>
+                      {commitment.charity?.website_url && (
+                        <a
+                          href={commitment.charity.website_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[11px] text-blue-400 hover:underline flex items-center gap-1 mt-0.5"
+                        >
+                          <span>Visit Charity</span>
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {commitment.status === "ACTIVE" && (
                 <div className="glass-panel glow-emerald flex items-center justify-between rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-5">
                   <div className="flex items-center gap-3.5">
@@ -410,9 +571,19 @@ export default function CommitmentDetailPage({ params }: PageProps) {
                       </p>
                     </div>
                   </div>
-                  <span className="hidden sm:inline-block rounded-lg bg-emerald-500/20 px-3 py-1 text-xs font-mono font-bold text-emerald-300 border border-emerald-500/30">
-                    VERIFIED ACTIVE
-                  </span>
+
+                  <button
+                    onClick={handleCheckResolution}
+                    disabled={isResolving}
+                    className="flex items-center gap-2 rounded-xl bg-emerald-500/20 px-3.5 py-2 text-xs font-mono font-bold text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 transition disabled:opacity-50"
+                  >
+                    {isResolving ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Award className="h-3.5 w-3.5 text-emerald-400" />
+                    )}
+                    <span>{isResolving ? "Checking..." : "Check Resolution Now"}</span>
+                  </button>
                 </div>
               )}
 
@@ -800,7 +971,7 @@ export default function CommitmentDetailPage({ params }: PageProps) {
                 </div>
               )}
 
-              {commitment.status !== "ACTIVE" && commitment.status !== "COMPLETED" && (
+              {commitment.status !== "ACTIVE" && commitment.status !== "COMPLETED" && commitment.status !== "FAILED" && (
                 <div className="glass-panel glow-emerald rounded-2xl border border-white/10 p-6 space-y-5">
                   <div className="flex items-start justify-between">
                     <div>

@@ -49,6 +49,7 @@ export interface Charity {
   category: string;
   description: string;
   logo_url?: string;
+  website_url?: string;
   is_active: boolean;
   razorpayx_fund_account_id?: string;
 }
@@ -141,6 +142,28 @@ export interface VerificationResult {
   created_at: string;
 }
 
+export interface Donation {
+  id: string;
+  commitment_id: string;
+  charity_id: string;
+  amount_paise: number;
+  outcome: "SUCCESS" | "FAILURE";
+  status: "PENDING" | "PROCESSING" | "PAID" | "FAILED";
+  razorpayx_payout_id?: string;
+  failure_reason?: string;
+  created_at: string;
+  charity?: Charity;
+}
+
+export interface ResolutionResult {
+  commitment: Commitment;
+  donation?: Donation;
+  progress: ProgressCalculation;
+  verification?: VerificationResult;
+  is_resolved: boolean;
+  state: "ACTIVE" | "COMPLETED" | "FAILED" | "DONATION_PENDING" | "DONATED";
+}
+
 export interface Commitment {
   id: string;
   user_id: string;
@@ -162,6 +185,7 @@ export interface Commitment {
   charity?: Charity;
   rules?: CommitmentRule[];
   evidence?: EvidenceItem[];
+  donation?: Donation;
 }
 
 export interface CreateCommitmentInput {
@@ -441,6 +465,16 @@ export const apiClient = {
           method: "GET",
         }
       ),
+
+    getStatus: (id: string) =>
+      request<ResolutionResult>(`/api/v1/commitments/${id}/status`, {
+        method: "GET",
+      }),
+
+    checkResolution: (id: string) =>
+      request<ResolutionResult>(`/api/v1/commitments/${id}/check-resolution`, {
+        method: "POST",
+      }),
   },
 
   payments: {
