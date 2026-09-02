@@ -13,6 +13,7 @@ import (
 	"github.com/jaiswalshivang/pledgepay/internal/config"
 	"github.com/jaiswalshivang/pledgepay/internal/handlers"
 	"github.com/jaiswalshivang/pledgepay/internal/middleware"
+	"github.com/jaiswalshivang/pledgepay/internal/payment"
 	"github.com/jaiswalshivang/pledgepay/internal/repository"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
@@ -53,13 +54,19 @@ func (s *Server) setupRoutes() {
 	var userRepo repository.UserRepository
 	var charityRepo repository.CharityRepository
 	var commitmentRepo repository.CommitmentRepository
+	var paymentRepo repository.PaymentRepository
+	var webhookRepo repository.WebhookRepository
+
 	if s.DB != nil {
 		userRepo = repository.NewUserRepository(s.DB)
 		charityRepo = repository.NewCharityRepository(s.DB)
 		commitmentRepo = repository.NewCommitmentRepository(s.DB)
+		paymentRepo = repository.NewPaymentRepository(s.DB)
+		webhookRepo = repository.NewWebhookRepository(s.DB)
 	}
 
 	groqClient := ai.NewGroqClient(s.Config.GroqAPIKey, s.Config.GroqModel)
+	razorpayClient := payment.NewRazorpayClient(s.Config.RazorpayKeyID, s.Config.RazorpayKeySecret)
 
 	v1 := s.Router.Group("/api/v1")
 	{
@@ -103,6 +110,21 @@ func (s *Server) setupRoutes() {
 				commGroup.POST("", commitmentHandler.CreateCommitment)
 				commGroup.GET("", commitmentHandler.ListMyCommitments)
 				commGroup.GET("/:id", commitmentHandler.GetCommitmentByID)
+			}
+		}
+
+		if paymentRepo != nil && commitmentRepo != nil && charityRepo != nil && webhookRepo != nil {
+			paymentHandler := handlers.NewPaymentHandler(s.Config, razorpayClient, paymentRepo, commitmentRepo, charityRepo, webhookRepo)
+			payGroup := v1.Group("/payments")
+			payGroup.Use(middleware.AuthRequired(s.Config.JWTSecret))
+			{
+				payGroup.POST("/create-order", paymentHandler.CreateOrder)
+				payGroup.POST("/verify", paymentHandler.VerifyPayment)
+			}
+
+			webhookGroup := v1.Group("/webhooks")
+			{
+				webhookGroup.POST("/razorpay", paymentHandler.HandleRazorpayWebhook)
 			}
 		}
 	}
