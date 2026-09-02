@@ -2,53 +2,49 @@
 
 @layer base {
   :root {
-    /* Palette Tokens: Ledger Precision + Human Impact */
-    --canvas-base: #0B0F17;
-    --canvas-subtle: #101622;
-    --canvas-raised: #151D2C;
-    --canvas-elevated: #1B2538;
-    --canvas-sunken: #070A0F;
+    /* Light Mode Clean Institutional Palette */
+    --canvas-base: #F8F9FA;
+    --canvas-card: #FFFFFF;
+    --canvas-subtle: #F1F3F5;
+    --canvas-sunken: #E9ECEF;
 
-    --border-subtle: #1C273A;
-    --border-default: #25334C;
-    --border-strong: #334466;
+    --border-subtle: #EDF0F2;
+    --border-default: #E4E7EB;
+    --border-strong: #D1D5DB;
 
-    --ink-primary: #F1F5F9;
-    --ink-secondary: #94A3B8;
-    --ink-muted: #64748B;
-    --ink-inverse: #0B0F17;
+    --ink-primary: #18181B;
+    --ink-secondary: #52525B;
+    --ink-muted: #71717A;
+    --ink-inverse: #FFFFFF;
 
-    /* Primary: Ledger Mint (Precision, Proof, Verification) */
-    --pledge-primary: #10B981;
-    --pledge-hover: #059669;
-    --pledge-subtle: rgba(16, 185, 129, 0.12);
-    --pledge-border: rgba(16, 185, 129, 0.3);
-    --pledge-text: #34D399;
+    /* Restrained Primary Accent: Deep Escrow Emerald */
+    --accent-primary: #047857;
+    --accent-hover: #065F46;
+    --accent-subtle: #ECFDF5;
+    --accent-border: #A7F3D0;
+    --accent-text: #065F46;
 
-    /* Secondary Accent: Impact Copper (Charity, Safety Net, Human Cause) */
-    --impact-primary: #E07A5F;
-    --impact-hover: #C9664D;
-    --impact-subtle: rgba(224, 122, 95, 0.12);
-    --impact-border: rgba(224, 122, 95, 0.35);
-    --impact-text: #F4A261;
+    /* Status Tokens (Used strictly for meaningful semantic states) */
+    --status-success: #15803D;
+    --status-success-bg: #F0FDF4;
+    --status-success-border: #BBF7D0;
 
-    /* Semantic Status Tokens */
-    --status-warning: #F59E0B;
-    --status-warning-subtle: rgba(245, 158, 11, 0.12);
-    --status-warning-border: rgba(245, 158, 11, 0.3);
+    --status-warning: #B45309;
+    --status-warning-bg: #FFFBEB;
+    --status-warning-border: #FDE68A;
 
-    --status-destructive: #EF4444;
-    --status-destructive-subtle: rgba(239, 68, 68, 0.12);
-    --status-destructive-border: rgba(239, 68, 68, 0.3);
+    --status-danger: #B91C1C;
+    --status-danger-bg: #FEF2F2;
+    --status-danger-border: #FECACA;
 
-    --status-info: #3B82F6;
-    --status-info-subtle: rgba(59, 130, 246, 0.12);
-    --status-info-border: rgba(59, 130, 246, 0.3);
+    --status-info: #1D4ED8;
+    --status-info-bg: #EFF6FF;
+    --status-info-border: #BFDBFE;
 
-    /* Radius Scale: Standardized 10px Core System */
+    /* Standardized 8px Radius Scale */
     --radius-sm: 6px;
-    --radius-md: 10px;
-    --radius-lg: 14px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
     --radius-full: 9999px;
   }
 }
@@ -64,41 +60,8 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Tabular and data styling */
+/* Tabular numbers for financial accuracy and metrics */
 .font-numeric {
   font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
   font-variant-numeric: tabular-nums;
-}
-
-/* Single Orchestrated Motion Moment: Hero Reveal */
-@keyframes heroEntry {
-  0% {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-hero-reveal {
-  animation: heroEntry 450ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* Clean structural utilities */
-.surface-raised {
-  background-color: var(--canvas-raised);
-  border: 1px solid var(--border-default);
-}
-
-.surface-sunken {
-  background-color: var(--canvas-sunken);
-  border: 1px solid var(--border-subtle);
-}
-
-.surface-elevated {
-  background-color: var(--canvas-elevated);
-  border: 1px solid var(--border-strong);
-  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.4);
 }

@@ -28,14 +28,14 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-[#090a0f] text-[#f3f4f6]">
+      <body className="min-h-full flex flex-col bg-[#F8F9FA] text-[#18181B]">
         <Providers>
           <Navbar />
           <main className="flex-1 flex flex-col">{children}</main>
-          <footer className="border-t border-white/5 py-6 text-center text-xs text-zinc-500">
-            PledgePay &copy; 2026 &bull; Scaffolded Monorepo
+          <footer className="border-t border-[#E4E7EB] bg-[#FFFFFF] py-6 text-center text-xs text-[#71717A]">
+            PledgePay &copy; 2026 &bull; Proof-of-Commitment Escrow Protocol
           </footer>
         </Providers>
       </body>
