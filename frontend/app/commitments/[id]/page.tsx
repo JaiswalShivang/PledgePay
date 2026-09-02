@@ -189,7 +189,7 @@ export default function CommitmentDetailPage({ params }: PageProps) {
   const activeRepo =
     selectedRepo ||
     commitment?.github_repo ||
-    (userRepos && userRepos.length > 0 ? userRepos[0].full_name : "demo-developer/dsa-daily-challenge");
+    (userRepos && userRepos.length > 0 ? userRepos[0].full_name : "");
 
   const handleLinkRepo = async () => {
     if (!activeRepo) return;
@@ -990,23 +990,27 @@ export default function CommitmentDetailPage({ params }: PageProps) {
                       <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
                         Assigned GitHub Repository
                       </label>
-                      <select
-                        value={activeRepo}
-                        onChange={(e) => setSelectedRepo(e.target.value)}
-                        className="w-full rounded-xl border border-white/10 bg-zinc-900 p-3 text-xs font-mono text-white outline-none focus:border-emerald-500"
-                      >
-                        {userRepos && userRepos.length > 0 ? (
-                          userRepos.map((repo) => (
+                      {userRepos && userRepos.length > 0 ? (
+                        <select
+                          value={activeRepo}
+                          onChange={(e) => setSelectedRepo(e.target.value)}
+                          className="w-full rounded-xl border border-white/10 bg-zinc-900 p-3 text-xs font-mono text-white outline-none focus:border-emerald-500"
+                        >
+                          {userRepos.map((repo) => (
                             <option key={repo.id} value={repo.full_name}>
                               {repo.full_name}
                             </option>
-                          ))
-                        ) : (
-                          <option value="demo-developer/dsa-daily-challenge">
-                            demo-developer/dsa-daily-challenge
-                          </option>
-                        )}
-                      </select>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          value={activeRepo}
+                          onChange={(e) => setSelectedRepo(e.target.value)}
+                          placeholder="e.g. username/repository-name"
+                          className="w-full rounded-xl border border-white/10 bg-zinc-900 p-3 text-xs font-mono text-white placeholder-zinc-600 outline-none focus:border-emerald-500"
+                        />
+                      )}
                     </div>
 
                     <button
