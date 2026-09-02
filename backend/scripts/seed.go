@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"os"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jaiswalshivang/pledgepay/internal/config"
 	"github.com/jaiswalshivang/pledgepay/internal/db"
 	"github.com/jaiswalshivang/pledgepay/internal/models"
@@ -32,6 +32,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
+	now := time.Now().UTC()
 	demoEmail := "demo@pledgepay.dev"
 	existingUser, err := userRepo.GetByEmail(ctx, demoEmail)
 	if err == nil && existingUser != nil {
@@ -45,10 +46,13 @@ func main() {
 
 		ghUsername := "demouser"
 		demoUser := &models.User{
+			ID:             uuid.New().String(),
 			Email:          demoEmail,
 			PasswordHash:   string(hashedPassword),
 			Name:           "Demo User",
 			GithubUsername: &ghUsername,
+			CreatedAt:      now,
+			UpdatedAt:      now,
 		}
 
 		if err := userRepo.Create(ctx, demoUser); err != nil {
@@ -58,76 +62,96 @@ func main() {
 		slog.Info("Demo user seeded successfully", "id", demoUser.ID, "email", demoUser.Email)
 	}
 
-	existingCharities, err := charityRepo.ListActive(ctx)
-	if err == nil && len(existingCharities) > 0 {
-		slog.Info("Charities already seeded", "count", len(existingCharities))
-		fmt.Printf("Seed complete: %d active charities found.\n", len(existingCharities))
-		return
-	}
-
 	logoEdu := "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=128&q=80"
 	logoFood := "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=128&q=80"
 	logoHealth := "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=128&q=80"
 	logoCode := "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=128&q=80"
 	logoGreen := "https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=128&q=80"
+	siteGive := "https://giveindia.org"
+	fundAcc := "fa_test_charity_fund_acc"
+	contactID := "cont_test_charity_contact"
 
-	fa1 := "fa_edu_demo_101"
-	fa2 := "fa_food_demo_102"
-	fa3 := "fa_health_demo_103"
-	fa4 := "fa_code_demo_104"
-	fa5 := "fa_green_demo_105"
-
-	charitiesToSeed := []models.Charity{
+	charities := []models.Charity{
 		{
-			Name:                   "Pratham Education Foundation",
-			Category:               "Education & Literacy",
-			Description:            "Dedicated to improving the quality of education and foundational learning for underprivileged children across India.",
+			ID:                     "10000000-0000-0000-0000-000000000001",
+			Name:                   "Educate Girls India",
+			Category:               "education",
+			Description:            "Mobilizes communities for girls' education in India's rural and educationally backward areas.",
+			WebsiteURL:             &siteGive,
 			LogoURL:                &logoEdu,
+			RazorpayxContactID:     &contactID,
+			RazorpayxFundAccountID: &fundAcc,
 			IsActive:               true,
-			RazorpayxFundAccountID: &fa1,
+			CreatedAt:              now,
+			UpdatedAt:              now,
 		},
 		{
+			ID:                     "10000000-0000-0000-0000-000000000002",
 			Name:                   "Akshaya Patra Foundation",
-			Category:               "Hunger Relief & Nutrition",
-			Description:            "Eliminating classroom hunger by feeding nutritious mid-day meals to millions of government school children daily.",
+			Category:               "poverty",
+			Description:            "Strives to eliminate classroom hunger by implementing the Mid-Day Meal Scheme in government schools.",
+			WebsiteURL:             &siteGive,
 			LogoURL:                &logoFood,
+			RazorpayxContactID:     &contactID,
+			RazorpayxFundAccountID: &fundAcc,
 			IsActive:               true,
-			RazorpayxFundAccountID: &fa2,
+			CreatedAt:              now,
+			UpdatedAt:              now,
 		},
 		{
-			Name:                   "GiveIndia Critical Health Fund",
-			Category:               "Healthcare & Medical Aid",
-			Description:            "Funding emergency surgeries, pediatric ICU care, and life-saving treatments for families below the poverty line.",
+			ID:                     "10000000-0000-0000-0000-000000000003",
+			Name:                   "Sankara Eye Foundation",
+			Category:               "health",
+			Description:            "Provides high-quality, free eye care surgeries to eradicate curable blindness across rural India.",
+			WebsiteURL:             &siteGive,
 			LogoURL:                &logoHealth,
+			RazorpayxContactID:     &contactID,
+			RazorpayxFundAccountID: &fundAcc,
 			IsActive:               true,
-			RazorpayxFundAccountID: &fa3,
+			CreatedAt:              now,
+			UpdatedAt:              now,
 		},
 		{
-			Name:                   "Code.org & Tech Empowerment",
-			Category:               "Computer Science & Tech Access",
-			Description:            "Democratizing access to programming education, open source tooling, and tech careers for underrepresented youth.",
+			ID:                     "10000000-0000-0000-0000-000000000004",
+			Name:                   "FreeCodeCamp Foundation",
+			Category:               "general",
+			Description:            "Creates free coding curricula and open learning resources for millions of aspiring developers worldwide.",
+			WebsiteURL:             &siteGive,
 			LogoURL:                &logoCode,
+			RazorpayxContactID:     &contactID,
+			RazorpayxFundAccountID: &fundAcc,
 			IsActive:               true,
-			RazorpayxFundAccountID: &fa4,
+			CreatedAt:              now,
+			UpdatedAt:              now,
 		},
 		{
-			Name:                   "Clean Planet & Reforestation Fund",
-			Category:               "Climate & Environment",
-			Description:            "Restoring native forests, protecting vital river ecosystems, and funding community-led renewable solar projects.",
+			ID:                     "10000000-0000-0000-0000-000000000005",
+			Name:                   "Grow-Trees India",
+			Category:               "environment",
+			Description:            "Plants trees in rural areas to combat deforestation, support wildlife, and generate rural employment.",
+			WebsiteURL:             &siteGive,
 			LogoURL:                &logoGreen,
+			RazorpayxContactID:     &contactID,
+			RazorpayxFundAccountID: &fundAcc,
 			IsActive:               true,
-			RazorpayxFundAccountID: &fa5,
+			CreatedAt:              now,
+			UpdatedAt:              now,
 		},
 	}
 
-	for _, ch := range charitiesToSeed {
-		item := ch
-		if err := charityRepo.Create(ctx, &item); err != nil {
-			slog.Error("Failed to seed charity", "name", item.Name, "error", err)
-		} else {
-			slog.Info("Seeded charity", "id", item.ID, "name", item.Name, "category", item.Category)
+	for _, c := range charities {
+		existingCharity, err := charityRepo.GetByID(ctx, c.ID)
+		if err == nil && existingCharity != nil {
+			slog.Info("Charity already exists", "name", c.Name, "id", c.ID)
+			continue
 		}
+
+		if err := charityRepo.Create(ctx, &c); err != nil {
+			slog.Error("Failed to seed charity", "name", c.Name, "error", err)
+			continue
+		}
+		slog.Info("Charity seeded successfully", "name", c.Name, "id", c.ID)
 	}
 
-	fmt.Println("Seed completed successfully with demo user and charities.")
+	slog.Info("Database seeding finished successfully")
 }

@@ -52,6 +52,7 @@ type Charity struct {
 	RazorpayxFundAccountID *string  `gorm:"type:varchar(255)" json:"razorpayx_fund_account_id"`
 	IsActive              bool      `gorm:"default:true;not null" json:"is_active"`
 	CreatedAt             time.Time `gorm:"default:now()" json:"created_at"`
+	UpdatedAt             time.Time `gorm:"default:now()" json:"updated_at"`
 }
 
 type Commitment struct {
