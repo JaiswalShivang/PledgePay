@@ -292,3 +292,33 @@ func (we *WebhookEvent) BeforeCreate(tx *gorm.DB) error {
 	}
 	return nil
 }
+
+type Charity struct {
+	ID                     string    `gorm:"type:uuid;primaryKey" json:"id"`
+	Name                   string    `gorm:"type:varchar(255);not null" json:"name"`
+	Category               string    `gorm:"type:varchar(100);not null" json:"category"`
+	Description            string    `gorm:"type:text;not null" json:"description"`
+	LogoURL                *string   `gorm:"type:varchar(500)" json:"logo_url,omitempty"`
+	IsActive               bool      `gorm:"not null;default:true;index" json:"is_active"`
+	RazorpayxFundAccountID *string   `gorm:"type:varchar(255)" json:"razorpayx_fund_account_id,omitempty"`
+	CreatedAt              time.Time `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt              time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+}
+
+func (Charity) TableName() string {
+	return "charities"
+}
+
+func (ch *Charity) BeforeCreate(tx *gorm.DB) error {
+	if ch.ID == "" {
+		ch.ID = uuid.New().String()
+	}
+	now := time.Now().UTC()
+	if ch.CreatedAt.IsZero() {
+		ch.CreatedAt = now
+	}
+	if ch.UpdatedAt.IsZero() {
+		ch.UpdatedAt = now
+	}
+	return nil
+}

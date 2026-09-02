@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/jaiswalshivang/pledgepay/internal/ai"
 	"github.com/jaiswalshivang/pledgepay/internal/config"
 	"github.com/jaiswalshivang/pledgepay/internal/handlers"
 	"github.com/jaiswalshivang/pledgepay/internal/middleware"
@@ -50,9 +51,13 @@ func (s *Server) setupRoutes() {
 	s.Router.GET("/healthz", s.handleHealthz)
 
 	var userRepo repository.UserRepository
+	var charityRepo repository.CharityRepository
 	if s.DB != nil {
 		userRepo = repository.NewUserRepository(s.DB)
+		charityRepo = repository.NewCharityRepository(s.DB)
 	}
+
+	groqClient := ai.NewGroqClient(s.Config.GroqAPIKey, s.Config.GroqModel)
 
 	v1 := s.Router.Group("/api/v1")
 	{
@@ -66,6 +71,26 @@ func (s *Server) setupRoutes() {
 			}
 
 			v1.GET("/me", middleware.AuthRequired(s.Config.JWTSecret), authHandler.GetMe)
+		}
+
+		if charityRepo != nil {
+			aiHandler := handlers.NewAIHandler(groqClient, charityRepo)
+			aiGroup := v1.Group("/ai")
+			{
+				aiGroup.POST("/structure-goal", aiHandler.StructureGoal)
+				aiGroup.POST("/analyze-quality", aiHandler.AnalyzeQuality)
+				aiGroup.POST("/suggest-charities", aiHandler.SuggestCharities)
+				aiGroup.POST("/analyze-combined", aiHandler.AnalyzeCombined)
+			}
+
+			v1.GET("/charities", func(c *gin.Context) {
+				list, err := charityRepo.ListActive(c.Request.Context())
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed_to_fetch_charities"})
+					return
+				}
+				c.JSON(http.StatusOK, gin.H{"charities": list})
+			})
 		}
 	}
 }

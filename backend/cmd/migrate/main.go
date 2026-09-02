@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -40,48 +41,65 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	var fileName string
-	if *action == "down" {
-		fileName = "000001_init_schema.down.sql"
-	} else {
-		fileName = "000001_init_schema.up.sql"
-	}
-
-	searchPaths := []string{
-		filepath.Join("migrations", fileName),
-		filepath.Join("backend", "migrations", fileName),
-		filepath.Join("..", "migrations", fileName),
-	}
-
-	var sqlBytes []byte
-	var foundPath string
-	for _, p := range searchPaths {
-		if content, err := os.ReadFile(p); err == nil {
-			sqlBytes = content
-			foundPath = p
+	candidates := []string{"migrations", filepath.Join("backend", "migrations"), filepath.Join("..", "migrations")}
+	var migDir string
+	for _, c := range candidates {
+		if stat, err := os.Stat(c); err == nil && stat.IsDir() {
+			migDir = c
 			break
 		}
 	}
 
-	if len(sqlBytes) == 0 {
-		slog.Error("Could not find migration file", "file", fileName)
+	if migDir == "" {
+		slog.Error("Could not find migrations directory")
 		os.Exit(1)
 	}
 
-	slog.Info("Running migration file", "path", foundPath, "action", *action)
+	entries, err := os.ReadDir(migDir)
+	if err != nil {
+		slog.Error("Failed to read migrations directory", "error", err)
+		os.Exit(1)
+	}
 
-	queries := strings.Split(string(sqlBytes), ";")
-	for _, q := range queries {
-		q = strings.TrimSpace(q)
-		if q == "" {
-			continue
-		}
-		if _, err := sqlDB.ExecContext(ctx, q); err != nil {
-			slog.Error("Failed to execute SQL statement", "query", q, "error", err)
-			os.Exit(1)
+	suffix := ".up.sql"
+	if *action == "down" {
+		suffix = ".down.sql"
+	}
+
+	var files []string
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), suffix) {
+			files = append(files, filepath.Join(migDir, e.Name()))
 		}
 	}
 
-	slog.Info("Migration completed successfully", "action", *action)
-	fmt.Printf("Migration '%s' applied successfully.\n", *action)
+	if *action == "down" {
+		sort.Sort(sort.Reverse(sort.StringSlice(files)))
+	} else {
+		sort.Strings(files)
+	}
+
+	for _, f := range files {
+		sqlBytes, err := os.ReadFile(f)
+		if err != nil {
+			slog.Error("Failed to read migration file", "file", f, "error", err)
+			os.Exit(1)
+		}
+
+		slog.Info("Running migration file", "path", f, "action", *action)
+		queries := strings.Split(string(sqlBytes), ";")
+		for _, q := range queries {
+			q = strings.TrimSpace(q)
+			if q == "" {
+				continue
+			}
+			if _, err := sqlDB.ExecContext(ctx, q); err != nil {
+				slog.Error("Failed to execute SQL statement", "file", f, "query", q, "error", err)
+				os.Exit(1)
+			}
+		}
+	}
+
+	slog.Info("All migrations completed successfully", "action", *action, "total_files", len(files))
+	fmt.Printf("Applied %d migration file(s) successfully.\n", len(files))
 }
