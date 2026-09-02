@@ -52,9 +52,11 @@ func (s *Server) setupRoutes() {
 
 	var userRepo repository.UserRepository
 	var charityRepo repository.CharityRepository
+	var commitmentRepo repository.CommitmentRepository
 	if s.DB != nil {
 		userRepo = repository.NewUserRepository(s.DB)
 		charityRepo = repository.NewCharityRepository(s.DB)
+		commitmentRepo = repository.NewCommitmentRepository(s.DB)
 	}
 
 	groqClient := ai.NewGroqClient(s.Config.GroqAPIKey, s.Config.GroqModel)
@@ -91,6 +93,17 @@ func (s *Server) setupRoutes() {
 				}
 				c.JSON(http.StatusOK, gin.H{"charities": list})
 			})
+		}
+
+		if commitmentRepo != nil && charityRepo != nil {
+			commitmentHandler := handlers.NewCommitmentHandler(commitmentRepo, charityRepo)
+			commGroup := v1.Group("/commitments")
+			commGroup.Use(middleware.AuthRequired(s.Config.JWTSecret))
+			{
+				commGroup.POST("", commitmentHandler.CreateCommitment)
+				commGroup.GET("", commitmentHandler.ListMyCommitments)
+				commGroup.GET("/:id", commitmentHandler.GetCommitmentByID)
+			}
 		}
 	}
 }

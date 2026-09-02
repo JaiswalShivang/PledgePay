@@ -36,6 +36,7 @@ func (r *commitmentRepository) Create(ctx context.Context, commitment *models.Co
 func (r *commitmentRepository) GetByID(ctx context.Context, id string) (*models.Commitment, error) {
 	var commitment models.Commitment
 	if err := r.db.WithContext(ctx).
+		Preload("Charity").
 		Preload("Rules").
 		Preload("Payments").
 		Preload("VerificationResults").
@@ -62,6 +63,7 @@ func (r *commitmentRepository) GetByIDForUpdate(ctx context.Context, tx *gorm.DB
 func (r *commitmentRepository) ListByUserID(ctx context.Context, userID string) ([]models.Commitment, error) {
 	var commitments []models.Commitment
 	if err := r.db.WithContext(ctx).
+		Preload("Charity").
 		Preload("Rules").
 		Preload("Payments").
 		Preload("VerificationResults", func(db *gorm.DB) *gorm.DB {
@@ -78,6 +80,7 @@ func (r *commitmentRepository) ListByUserID(ctx context.Context, userID string) 
 func (r *commitmentRepository) ListActiveCommitments(ctx context.Context) ([]models.Commitment, error) {
 	var commitments []models.Commitment
 	if err := r.db.WithContext(ctx).
+		Preload("Charity").
 		Preload("Rules").
 		Where("status = ? AND end_date >= ?", "ACTIVE", time.Now().UTC()).
 		Find(&commitments).Error; err != nil {

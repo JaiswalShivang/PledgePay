@@ -74,6 +74,7 @@ func (u *User) BeforeCreate(tx *gorm.DB) error {
 type Commitment struct {
 	ID           string    `gorm:"type:uuid;primaryKey" json:"id"`
 	UserID       string    `gorm:"type:uuid;not null;index" json:"user_id"`
+	CharityID    *string   `gorm:"type:uuid;index" json:"charity_id,omitempty"`
 	Title        string    `gorm:"type:varchar(255);not null" json:"title"`
 	Description  *string   `gorm:"type:text" json:"description,omitempty"`
 	TargetCount  int       `gorm:"not null" json:"target_count"`
@@ -89,6 +90,7 @@ type Commitment struct {
 	UpdatedAt    time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 
 	User                *User                `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Charity             *Charity             `gorm:"foreignKey:CharityID" json:"charity,omitempty"`
 	Rules               []CommitmentRule     `gorm:"foreignKey:CommitmentID;constraint:OnDelete:CASCADE" json:"rules,omitempty"`
 	Payments            []Payment            `gorm:"foreignKey:CommitmentID;constraint:OnDelete:CASCADE" json:"payments,omitempty"`
 	Evidence            []Evidence           `gorm:"foreignKey:CommitmentID;constraint:OnDelete:CASCADE" json:"evidence,omitempty"`
