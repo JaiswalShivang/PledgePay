@@ -91,10 +91,31 @@ export interface CommitmentRule {
   created_at: string;
 }
 
+export interface EvidenceItem {
+  id: string;
+  commitment_id: string;
+  source: string;
+  source_ref: string;
+  raw_payload: {
+    sha?: string;
+    message?: string;
+    author?: string;
+    repo?: string;
+    url?: string;
+    number?: number;
+    title?: string;
+    state?: string;
+    merged?: boolean;
+  };
+  occurred_at: string;
+  ingested_at: string;
+}
+
 export interface Commitment {
   id: string;
   user_id: string;
   charity_id?: string;
+  github_repo?: string;
   title: string;
   description?: string;
   target_count: number;
@@ -110,6 +131,7 @@ export interface Commitment {
   updated_at: string;
   charity?: Charity;
   rules?: CommitmentRule[];
+  evidence?: EvidenceItem[];
 }
 
 export interface CreateCommitmentInput {
@@ -140,6 +162,15 @@ export interface VerifyPaymentInput {
   razorpay_order_id: string;
   razorpay_payment_id: string;
   razorpay_signature: string;
+}
+
+export interface GitHubRepoItem {
+  id: number;
+  name: string;
+  full_name: string;
+  private: boolean;
+  description: string;
+  html_url: string;
 }
 
 export class ApiError extends Error {
@@ -330,6 +361,32 @@ export const apiClient = {
       request<{ commitment: Commitment }>(`/api/v1/commitments/${id}`, {
         method: "GET",
       }),
+
+    linkRepo: (id: string, repo: string) =>
+      request<{ status: string; commitment: Commitment; github_repo: string }>(
+        `/api/v1/commitments/${id}/link-repo`,
+        {
+          method: "POST",
+          body: JSON.stringify({ repo }),
+        }
+      ),
+
+    syncEvidence: (id: string) =>
+      request<{
+        synced_count: number;
+        total_evidence: number;
+        evidence: EvidenceItem[];
+      }>(`/api/v1/commitments/${id}/sync-evidence`, {
+        method: "POST",
+      }),
+
+    getEvidence: (id: string) =>
+      request<{ evidence: EvidenceItem[] }>(
+        `/api/v1/commitments/${id}/evidence`,
+        {
+          method: "GET",
+        }
+      ),
   },
 
   payments: {
@@ -347,5 +404,22 @@ export const apiClient = {
           body: JSON.stringify(input),
         }
       ),
+  },
+
+  integrations: {
+    getGitHubConnectUrl: (redirectUri?: string) =>
+      request<{ url: string; state: string }>(
+        `/api/v1/integrations/github/connect?json=true${
+          redirectUri ? `&redirect_uri=${encodeURIComponent(redirectUri)}` : ""
+        }`,
+        {
+          method: "GET",
+        }
+      ),
+
+    listGitHubRepos: () =>
+      request<{ repos: GitHubRepoItem[] }>("/api/v1/integrations/github/repos", {
+        method: "GET",
+      }),
   },
 };

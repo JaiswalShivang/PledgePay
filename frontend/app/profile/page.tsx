@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { AuthGuard } from "@/components/auth-guard";
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
+import { apiClient } from "@/lib/api-client";
 import {
   User as UserIcon,
   Mail,
@@ -19,10 +21,25 @@ import { GithubIcon } from "@/components/icons";
 export default function ProfilePage() {
   const { user, logout, isLoggingOut } = useAuth();
   const router = useRouter();
+  const [isConnectingGh, setIsConnectingGh] = useState(false);
 
   const handleLogout = async () => {
     await logout();
     router.push("/login");
+  };
+
+  const handleConnectGitHub = async () => {
+    setIsConnectingGh(true);
+    try {
+      const res = await apiClient.integrations.getGitHubConnectUrl(
+        window.location.href
+      );
+      if (res.url) {
+        window.location.href = res.url;
+      }
+    } catch {
+      setIsConnectingGh(false);
+    }
   };
 
   const hasGithub =
@@ -169,15 +186,16 @@ export default function ProfilePage() {
                   </div>
 
                   <button
-                    onClick={() => {
-                      if (!hasGithub) {
-                        alert("GitHub integration connect flow activates in Prompt 3!");
-                      }
-                    }}
-                    className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-200 transition hover:bg-zinc-700"
+                    onClick={handleConnectGitHub}
+                    disabled={isConnectingGh}
+                    className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-200 transition hover:bg-zinc-700 disabled:opacity-50"
                   >
-                    <span>{hasGithub ? "Manage" : "Connect"}</span>
-                    <ExternalLink className="h-3 w-3" />
+                    {isConnectingGh ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <ExternalLink className="h-3 w-3" />
+                    )}
+                    <span>{hasGithub ? "Reconnect" : "Connect"}</span>
                   </button>
                 </div>
               </div>

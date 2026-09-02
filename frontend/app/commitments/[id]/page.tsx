@@ -4,7 +4,12 @@ import { use, useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { AuthGuard } from "@/components/auth-guard";
-import { apiClient, Commitment } from "@/lib/api-client";
+import {
+  apiClient,
+  Commitment,
+  EvidenceItem,
+  GitHubRepoItem,
+} from "@/lib/api-client";
 import {
   Calendar,
   Coins,
@@ -21,6 +26,11 @@ import {
   ShieldCheck,
   Flame,
   Zap,
+  RefreshCw,
+  GitCommit,
+  GitBranch,
+  ExternalLink,
+  Check,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -68,6 +78,11 @@ export default function CommitmentDetailPage({ params }: PageProps) {
   >("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const [selectedRepo, setSelectedRepo] = useState<string>("");
+  const [isLinkingRepo, setIsLinkingRepo] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncSuccessMsg, setSyncSuccessMsg] = useState<string | null>(null);
+
   useEffect(() => {
     if (typeof window !== "undefined" && !document.getElementById("razorpay-checkout-script")) {
       const script = document.createElement("script");
@@ -92,6 +107,62 @@ export default function CommitmentDetailPage({ params }: PageProps) {
     },
     enabled: !!commitmentId,
   });
+
+  const { data: userRepos } = useQuery<GitHubRepoItem[]>({
+    queryKey: ["github-repos"],
+    queryFn: async () => {
+      const res = await apiClient.integrations.listGitHubRepos();
+      return res.repos;
+    },
+    enabled: !!commitment && commitment.status === "ACTIVE",
+  });
+
+  const { data: evidenceData, refetch: refetchEvidence } = useQuery<EvidenceItem[]>({
+    queryKey: ["evidence", commitmentId],
+    queryFn: async () => {
+      const res = await apiClient.commitments.getEvidence(commitmentId);
+      return res.evidence;
+    },
+    enabled: !!commitment && commitment.status === "ACTIVE",
+  });
+
+  const activeRepo =
+    selectedRepo ||
+    commitment?.github_repo ||
+    (userRepos && userRepos.length > 0 ? userRepos[0].full_name : "demo-developer/dsa-daily-challenge");
+
+  const handleLinkRepo = async () => {
+    if (!activeRepo) return;
+    setIsLinkingRepo(true);
+    setErrorMessage(null);
+    try {
+      await apiClient.commitments.linkRepo(commitmentId, activeRepo);
+      refetch();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to link repository";
+      setErrorMessage(msg);
+    } finally {
+      setIsLinkingRepo(false);
+    }
+  };
+
+  const handleSyncNow = async () => {
+    setIsSyncing(true);
+    setSyncSuccessMsg(null);
+    setErrorMessage(null);
+    try {
+      const res = await apiClient.commitments.syncEvidence(commitmentId);
+      refetchEvidence();
+      refetch();
+      setSyncSuccessMsg(`Successfully synced ${res.synced_count} evidence items.`);
+      setTimeout(() => setSyncSuccessMsg(null), 4000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to sync evidence";
+      setErrorMessage(msg);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const handlePledgePayment = async () => {
     if (!commitment) return;
@@ -237,9 +308,16 @@ export default function CommitmentDetailPage({ params }: PageProps) {
                 <div className="flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
                   <AlertCircle className="h-5 w-5 shrink-0 text-red-400" />
                   <div>
-                    <div className="font-semibold">Payment Error</div>
+                    <div className="font-semibold">Error</div>
                     <div className="text-xs text-red-300/90 mt-0.5">{errorMessage}</div>
                   </div>
+                </div>
+              )}
+
+              {syncSuccessMsg && (
+                <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-xs font-semibold text-emerald-300">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                  <span>{syncSuccessMsg}</span>
                 </div>
               )}
 
@@ -334,6 +412,145 @@ export default function CommitmentDetailPage({ params }: PageProps) {
                   </div>
                 </div>
               </div>
+
+              {commitment.status === "ACTIVE" && (
+                <div className="glass-panel rounded-2xl border border-white/10 p-6 space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+                    <div>
+                      <h3 className="text-base font-bold text-white flex items-center gap-2">
+                        <GitBranch className="h-4 w-4 text-emerald-400" />
+                        <span>Linked Repository & Automated Evidence Poller</span>
+                      </h3>
+                      <p className="text-xs text-zinc-400 mt-0.5">
+                        Evidence is fetched concurrently across commits, PRs, and issues.
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={handleSyncNow}
+                      disabled={isSyncing}
+                      className="glow-emerald flex items-center gap-2 rounded-xl bg-zinc-900 border border-emerald-500/30 px-4 py-2 text-xs font-bold text-emerald-300 hover:bg-emerald-500/10 transition disabled:opacity-50"
+                    >
+                      <RefreshCw
+                        className={`h-3.5 w-3.5 text-emerald-400 ${
+                          isSyncing ? "animate-spin" : ""
+                        }`}
+                      />
+                      <span>{isSyncing ? "Syncing Evidence..." : "Sync Now"}</span>
+                    </button>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center gap-3">
+                    <div className="w-full">
+                      <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
+                        Assigned GitHub Repository
+                      </label>
+                      <select
+                        value={activeRepo}
+                        onChange={(e) => setSelectedRepo(e.target.value)}
+                        className="w-full rounded-xl border border-white/10 bg-zinc-900 p-3 text-xs font-mono text-white outline-none focus:border-emerald-500"
+                      >
+                        {userRepos && userRepos.length > 0 ? (
+                          userRepos.map((repo) => (
+                            <option key={repo.id} value={repo.full_name}>
+                              {repo.full_name}
+                            </option>
+                          ))
+                        ) : (
+                          <option value="demo-developer/dsa-daily-challenge">
+                            demo-developer/dsa-daily-challenge
+                          </option>
+                        )}
+                      </select>
+                    </div>
+
+                    <button
+                      onClick={handleLinkRepo}
+                      disabled={isLinkingRepo || activeRepo === commitment.github_repo}
+                      className="mt-6 flex shrink-0 items-center gap-1.5 rounded-xl bg-zinc-800 border border-white/10 px-4 py-3 text-xs font-semibold text-white hover:bg-zinc-700 transition disabled:opacity-40"
+                    >
+                      {isLinkingRepo ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Check className="h-3.5 w-3.5 text-emerald-400" />
+                      )}
+                      <span>{activeRepo === commitment.github_repo ? "Linked" : "Link Repo"}</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-zinc-400 font-mono">
+                        Raw Evidence Stream ({evidenceData?.length || 0})
+                      </span>
+                      <span className="text-[10px] text-emerald-400 font-mono">
+                        Deduplicated by source_ref
+                      </span>
+                    </div>
+
+                    {evidenceData && evidenceData.length > 0 ? (
+                      <div className="divide-y divide-white/5 rounded-xl border border-white/5 bg-zinc-900/40">
+                        {evidenceData.map((ev) => (
+                          <div
+                            key={ev.id}
+                            className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3.5 hover:bg-white/[0.02] transition"
+                          >
+                            <div className="flex items-start gap-2.5">
+                              {ev.source === "github_commit" ? (
+                                <GitCommit className="h-4 w-4 text-emerald-400 mt-0.5 shrink-0" />
+                              ) : (
+                                <GitPullRequest className="h-4 w-4 text-blue-400 mt-0.5 shrink-0" />
+                              )}
+                              <div>
+                                <div className="text-xs font-semibold text-white">
+                                  {ev.raw_payload.message || ev.raw_payload.title || ev.source_ref}
+                                </div>
+                                <div className="flex items-center gap-2 text-[10px] text-zinc-400 mt-0.5">
+                                  <span className="font-mono text-zinc-300">
+                                    {ev.source_ref}
+                                  </span>
+                                  <span>•</span>
+                                  <span>{new Date(ev.occurred_at).toLocaleString()}</span>
+                                  {ev.raw_payload.author && (
+                                    <>
+                                      <span>•</span>
+                                      <span className="text-emerald-400">
+                                        @{ev.raw_payload.author}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {ev.raw_payload.url && (
+                              <a
+                                href={ev.raw_payload.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="self-end sm:self-center flex items-center gap-1 text-[10px] text-zinc-400 hover:text-white transition"
+                              >
+                                <span>Inspect</span>
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-white/10 p-8 text-center">
+                        <GitCommit className="mx-auto h-8 w-8 text-zinc-600 mb-2" />
+                        <div className="text-xs font-semibold text-zinc-300">
+                          No evidence items recorded yet
+                        </div>
+                        <p className="text-[11px] text-zinc-500 mt-1 max-w-sm mx-auto">
+                          Click &quot;Sync Now&quot; above or push code to your linked GitHub repository.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {commitment.charity && (
                 <div className="glass-panel rounded-2xl border border-white/10 p-6 space-y-4">
