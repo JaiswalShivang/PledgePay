@@ -5,323 +5,167 @@ import (
 	"encoding/json"
 	"errors"
 	"time"
-
-	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 type JSONB map[string]interface{}
 
 func (j JSONB) Value() (driver.Value, error) {
 	if j == nil {
-		return "{}", nil
+		return nil, nil
 	}
 	return json.Marshal(j)
 }
 
 func (j *JSONB) Scan(value interface{}) error {
 	if value == nil {
-		*j = JSONB{}
+		*j = nil
 		return nil
 	}
-	var bytes []byte
-	switch v := value.(type) {
-	case []byte:
-		bytes = v
-	case string:
-		bytes = []byte(v)
-	default:
-		return errors.New("failed to unmarshal JSONB value: invalid type")
-	}
-	if len(bytes) == 0 {
-		*j = JSONB{}
-		return nil
+	bytes, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
 	}
 	return json.Unmarshal(bytes, j)
 }
 
 type User struct {
-	ID             string    `gorm:"type:uuid;primaryKey" json:"id"`
+	ID             string    `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
 	Email          string    `gorm:"type:varchar(255);uniqueIndex;not null" json:"email"`
 	PasswordHash   string    `gorm:"type:varchar(255);not null" json:"-"`
 	Name           string    `gorm:"type:varchar(255);not null" json:"name"`
-	GithubUsername *string   `gorm:"type:varchar(255)" json:"github_username,omitempty"`
-	CreatedAt      time.Time `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt      time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+	GithubUsername *string   `gorm:"type:varchar(255)" json:"github_username"`
+	CreatedAt      time.Time `gorm:"default:now()" json:"created_at"`
+	UpdatedAt      time.Time `gorm:"default:now()" json:"updated_at"`
 
-	Commitments  []Commitment  `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE" json:"commitments,omitempty"`
-	Integrations []Integration `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE" json:"integrations,omitempty"`
+	Integrations []Integration `gorm:"foreignKey:UserID" json:"integrations,omitempty"`
+	Commitments  []Commitment  `gorm:"foreignKey:UserID" json:"commitments,omitempty"`
 }
 
-func (User) TableName() string {
-	return "users"
-}
-
-func (u *User) BeforeCreate(tx *gorm.DB) error {
-	if u.ID == "" {
-		u.ID = uuid.New().String()
-	}
-	now := time.Now().UTC()
-	if u.CreatedAt.IsZero() {
-		u.CreatedAt = now
-	}
-	if u.UpdatedAt.IsZero() {
-		u.UpdatedAt = now
-	}
-	return nil
+type Charity struct {
+	ID                    string    `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	Name                  string    `gorm:"type:varchar(255);not null" json:"name"`
+	Category              string    `gorm:"type:varchar(100);not null" json:"category"`
+	Description           string    `gorm:"type:text;not null" json:"description"`
+	LogoURL               *string   `gorm:"type:varchar(500)" json:"logo_url"`
+	WebsiteURL            *string   `gorm:"type:varchar(500);default:'https://giveindia.org'" json:"website_url"`
+	RazorpayxContactID    *string   `gorm:"type:varchar(255);default:'cont_test_charity'" json:"razorpayx_contact_id"`
+	RazorpayxFundAccountID *string  `gorm:"type:varchar(255)" json:"razorpayx_fund_account_id"`
+	IsActive              bool      `gorm:"default:true;not null" json:"is_active"`
+	CreatedAt             time.Time `gorm:"default:now()" json:"created_at"`
 }
 
 type Commitment struct {
-	ID           string    `gorm:"type:uuid;primaryKey" json:"id"`
+	ID           string    `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
 	UserID       string    `gorm:"type:uuid;not null;index" json:"user_id"`
-	CharityID    *string   `gorm:"type:uuid;index" json:"charity_id,omitempty"`
-	GithubRepo   *string   `gorm:"type:varchar(255);index" json:"github_repo,omitempty"`
+	CharityID    *string   `gorm:"type:uuid;index" json:"charity_id"`
+	GithubRepo   *string   `gorm:"type:varchar(255);index" json:"github_repo"`
 	Title        string    `gorm:"type:varchar(255);not null" json:"title"`
-	Description  *string   `gorm:"type:text" json:"description,omitempty"`
+	Description  *string   `gorm:"type:text" json:"description"`
 	TargetCount  int       `gorm:"not null" json:"target_count"`
 	Unit         string    `gorm:"type:varchar(50);not null" json:"unit"`
 	DurationDays int       `gorm:"not null" json:"duration_days"`
 	StartDate    time.Time `gorm:"not null" json:"start_date"`
 	EndDate      time.Time `gorm:"not null" json:"end_date"`
-	EvidenceType string    `gorm:"type:varchar(50);not null" json:"evidence_type"`
+	EvidenceType string    `gorm:"type:varchar(100);not null" json:"evidence_type"`
 	AmountPaise  int64     `gorm:"not null" json:"amount_paise"`
 	Status       string    `gorm:"type:varchar(50);not null;default:'DRAFT';index" json:"status"`
-	QualityScore *float64  `gorm:"type:numeric(5,2)" json:"quality_score,omitempty"`
-	CreatedAt    time.Time `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt    time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+	QualityScore *float64  `json:"quality_score"`
+	CreatedAt    time.Time `gorm:"default:now()" json:"created_at"`
+	UpdatedAt    time.Time `gorm:"default:now()" json:"updated_at"`
 
-	User                *User                `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	Charity             *Charity             `gorm:"foreignKey:CharityID" json:"charity,omitempty"`
-	Rules               []CommitmentRule     `gorm:"foreignKey:CommitmentID;constraint:OnDelete:CASCADE" json:"rules,omitempty"`
-	Payments            []Payment            `gorm:"foreignKey:CommitmentID;constraint:OnDelete:CASCADE" json:"payments,omitempty"`
-	Evidence            []Evidence           `gorm:"foreignKey:CommitmentID;constraint:OnDelete:CASCADE" json:"evidence,omitempty"`
-	VerificationResults []VerificationResult `gorm:"foreignKey:CommitmentID;constraint:OnDelete:CASCADE" json:"verification_results,omitempty"`
-}
-
-func (Commitment) TableName() string {
-	return "commitments"
-}
-
-func (c *Commitment) BeforeCreate(tx *gorm.DB) error {
-	if c.ID == "" {
-		c.ID = uuid.New().String()
-	}
-	now := time.Now().UTC()
-	if c.CreatedAt.IsZero() {
-		c.CreatedAt = now
-	}
-	if c.UpdatedAt.IsZero() {
-		c.UpdatedAt = now
-	}
-	return nil
+	User     *User            `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Charity  *Charity         `gorm:"foreignKey:CharityID" json:"charity,omitempty"`
+	Rules    []CommitmentRule `gorm:"foreignKey:CommitmentID" json:"rules,omitempty"`
+	Payment  *Payment         `gorm:"foreignKey:CommitmentID" json:"payment,omitempty"`
+	Donation *Donation        `gorm:"foreignKey:CommitmentID" json:"donation,omitempty"`
 }
 
 type CommitmentRule struct {
-	ID           string    `gorm:"type:uuid;primaryKey" json:"id"`
+	ID           string    `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
 	CommitmentID string    `gorm:"type:uuid;not null;index" json:"commitment_id"`
 	RuleType     string    `gorm:"type:varchar(100);not null" json:"rule_type"`
-	RuleConfig   JSONB     `gorm:"type:jsonb;not null;default:'{}'" json:"rule_config"`
-	CreatedAt    time.Time `gorm:"autoCreateTime" json:"created_at"`
-}
-
-func (CommitmentRule) TableName() string {
-	return "commitment_rules"
-}
-
-func (cr *CommitmentRule) BeforeCreate(tx *gorm.DB) error {
-	if cr.ID == "" {
-		cr.ID = uuid.New().String()
-	}
-	if cr.CreatedAt.IsZero() {
-		cr.CreatedAt = time.Now().UTC()
-	}
-	return nil
-}
-
-type Payment struct {
-	ID                string    `gorm:"type:uuid;primaryKey" json:"id"`
-	CommitmentID      string    `gorm:"type:uuid;not null;index" json:"commitment_id"`
-	RazorpayOrderID   string    `gorm:"type:varchar(255);not null;index" json:"razorpay_order_id"`
-	RazorpayPaymentID *string   `gorm:"type:varchar(255)" json:"razorpay_payment_id,omitempty"`
-	RazorpaySignature *string   `gorm:"type:varchar(255)" json:"razorpay_signature,omitempty"`
-	AmountPaise       int64     `gorm:"not null" json:"amount_paise"`
-	Status            string    `gorm:"type:varchar(50);not null;default:'PENDING'" json:"status"`
-	CreatedAt         time.Time `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt         time.Time `gorm:"autoUpdateTime" json:"updated_at"`
-
-	Refunds []Refund `gorm:"foreignKey:PaymentID;constraint:OnDelete:CASCADE" json:"refunds,omitempty"`
-}
-
-func (Payment) TableName() string {
-	return "payments"
-}
-
-func (p *Payment) BeforeCreate(tx *gorm.DB) error {
-	if p.ID == "" {
-		p.ID = uuid.New().String()
-	}
-	now := time.Now().UTC()
-	if p.CreatedAt.IsZero() {
-		p.CreatedAt = now
-	}
-	if p.UpdatedAt.IsZero() {
-		p.UpdatedAt = now
-	}
-	return nil
-}
-
-type Refund struct {
-	ID               string    `gorm:"type:uuid;primaryKey" json:"id"`
-	PaymentID        string    `gorm:"type:uuid;not null;index" json:"payment_id"`
-	RazorpayRefundID string    `gorm:"type:varchar(255);not null" json:"razorpay_refund_id"`
-	AmountPaise      int64     `gorm:"not null" json:"amount_paise"`
-	Status           string    `gorm:"type:varchar(50);not null;default:'PENDING'" json:"status"`
-	CreatedAt        time.Time `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt        time.Time `gorm:"autoUpdateTime" json:"updated_at"`
-}
-
-func (Refund) TableName() string {
-	return "refunds"
-}
-
-func (r *Refund) BeforeCreate(tx *gorm.DB) error {
-	if r.ID == "" {
-		r.ID = uuid.New().String()
-	}
-	now := time.Now().UTC()
-	if r.CreatedAt.IsZero() {
-		r.CreatedAt = now
-	}
-	if r.UpdatedAt.IsZero() {
-		r.UpdatedAt = now
-	}
-	return nil
+	RuleConfig   JSONB     `gorm:"type:jsonb;not null" json:"rule_config"`
+	CreatedAt    time.Time `gorm:"default:now()" json:"created_at"`
 }
 
 type Integration struct {
-	ID               string    `gorm:"type:uuid;primaryKey" json:"id"`
+	ID               string    `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
 	UserID           string    `gorm:"type:uuid;not null;index" json:"user_id"`
 	Provider         string    `gorm:"type:varchar(50);not null" json:"provider"`
 	AccessTokenEnc   string    `gorm:"type:text;not null" json:"-"`
-	RefreshTokenEnc  *string   `gorm:"type:text" json:"-"`
-	ExternalUsername *string   `gorm:"type:varchar(255)" json:"external_username,omitempty"`
-	ConnectedAt      time.Time `gorm:"autoCreateTime" json:"connected_at"`
-}
-
-func (Integration) TableName() string {
-	return "integrations"
-}
-
-func (i *Integration) BeforeCreate(tx *gorm.DB) error {
-	if i.ID == "" {
-		i.ID = uuid.New().String()
-	}
-	if i.ConnectedAt.IsZero() {
-		i.ConnectedAt = time.Now().UTC()
-	}
-	return nil
+	ExternalUsername *string   `gorm:"type:varchar(255)" json:"external_username"`
+	ConnectedAt      time.Time `gorm:"default:now()" json:"connected_at"`
 }
 
 type Evidence struct {
-	ID           string    `gorm:"type:uuid;primaryKey" json:"id"`
+	ID           string    `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
 	CommitmentID string    `gorm:"type:uuid;not null;index" json:"commitment_id"`
 	Source       string    `gorm:"type:varchar(50);not null" json:"source"`
 	SourceRef    string    `gorm:"type:varchar(255);not null" json:"source_ref"`
-	RawPayload   JSONB     `gorm:"type:jsonb;not null;default:'{}'" json:"raw_payload"`
-	OccurredAt   time.Time `gorm:"not null;index" json:"occurred_at"`
-	IngestedAt   time.Time `gorm:"autoCreateTime" json:"ingested_at"`
-}
-
-func (Evidence) TableName() string {
-	return "evidence"
-}
-
-func (e *Evidence) BeforeCreate(tx *gorm.DB) error {
-	if e.ID == "" {
-		e.ID = uuid.New().String()
-	}
-	if e.IngestedAt.IsZero() {
-		e.IngestedAt = time.Now().UTC()
-	}
-	return nil
+	RawPayload   JSONB     `gorm:"type:jsonb;not null" json:"raw_payload"`
+	OccurredAt   time.Time `gorm:"not null" json:"occurred_at"`
+	IngestedAt   time.Time `gorm:"default:now()" json:"ingested_at"`
 }
 
 type VerificationResult struct {
-	ID             string    `gorm:"type:uuid;primaryKey" json:"id"`
-	CommitmentID   string    `gorm:"type:uuid;not null;index" json:"commitment_id"`
-	EvidenceCount  int       `gorm:"not null;default:0" json:"evidence_count"`
-	VerifiedCount  int       `gorm:"not null;default:0" json:"verified_count"`
-	ProgressPct    float64   `gorm:"type:numeric(5,2);not null;default:0" json:"progress_pct"`
-	AnomalyFlag    bool      `gorm:"not null;default:false" json:"anomaly_flag"`
-	AnomalyReason  *string   `gorm:"type:text" json:"anomaly_reason,omitempty"`
-	AIConfidence   *float64  `gorm:"type:numeric(5,2)" json:"ai_confidence,omitempty"`
-	AISummary      JSONB     `gorm:"type:jsonb" json:"ai_summary,omitempty"`
-	CreatedAt      time.Time `gorm:"autoCreateTime" json:"created_at"`
+	ID            string    `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	CommitmentID  string    `gorm:"type:uuid;not null;index" json:"commitment_id"`
+	EvidenceCount int       `gorm:"not null" json:"evidence_count"`
+	VerifiedCount int       `gorm:"not null" json:"verified_count"`
+	ProgressPct   float64   `gorm:"type:numeric(5,2);not null" json:"progress_pct"`
+	AnomalyFlag   bool      `gorm:"default:false;not null" json:"anomaly_flag"`
+	AnomalyReason *string   `gorm:"type:text" json:"anomaly_reason"`
+	AIConfidence  *float64  `gorm:"type:numeric(5,2)" json:"ai_confidence"`
+	AISummary     JSONB     `gorm:"type:jsonb" json:"ai_summary"`
+	CreatedAt     time.Time `gorm:"default:now()" json:"created_at"`
 }
 
-func (VerificationResult) TableName() string {
-	return "verification_results"
+type Payment struct {
+	ID                string     `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	CommitmentID      string     `gorm:"type:uuid;not null;uniqueIndex" json:"commitment_id"`
+	RazorpayOrderID   string     `gorm:"type:varchar(255);uniqueIndex;not null" json:"razorpay_order_id"`
+	RazorpayPaymentID *string    `gorm:"type:varchar(255);index" json:"razorpay_payment_id"`
+	AmountPaise       int64      `gorm:"not null" json:"amount_paise"`
+	Currency          string     `gorm:"type:varchar(10);default:'INR';not null" json:"currency"`
+	Status            string     `gorm:"type:varchar(50);not null;default:'PENDING';index" json:"status"`
+	CreatedAt         time.Time  `gorm:"default:now()" json:"created_at"`
+	UpdatedAt         time.Time  `gorm:"default:now()" json:"updated_at"`
+
+	Refunds           []Refund   `gorm:"foreignKey:PaymentID" json:"refunds,omitempty"`
 }
 
-func (vr *VerificationResult) BeforeCreate(tx *gorm.DB) error {
-	if vr.ID == "" {
-		vr.ID = uuid.New().String()
-	}
-	if vr.CreatedAt.IsZero() {
-		vr.CreatedAt = time.Now().UTC()
-	}
-	return nil
+type Refund struct {
+	ID               string    `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	PaymentID        string    `gorm:"type:uuid;not null;index" json:"payment_id"`
+	RazorpayRefundID string    `gorm:"type:varchar(255);uniqueIndex;not null" json:"razorpay_refund_id"`
+	AmountPaise      int64     `gorm:"not null" json:"amount_paise"`
+	Status           string    `gorm:"type:varchar(50);not null;default:'PENDING';index" json:"status"`
+	CreatedAt        time.Time `gorm:"default:now()" json:"created_at"`
+}
+
+type Donation struct {
+	ID                string    `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	CommitmentID      string    `gorm:"type:uuid;not null;uniqueIndex" json:"commitment_id"`
+	CharityID         string    `gorm:"type:uuid;not null;index" json:"charity_id"`
+	AmountPaise       int64     `gorm:"not null" json:"amount_paise"`
+	Outcome           string    `gorm:"type:varchar(50);not null" json:"outcome"`
+	Status            string    `gorm:"type:varchar(50);not null;default:'PENDING';index" json:"status"`
+	RazorpayxPayoutID *string   `gorm:"type:varchar(255)" json:"razorpayx_payout_id"`
+	FailureReason     *string   `gorm:"type:text" json:"failure_reason"`
+	CreatedAt         time.Time `gorm:"default:now()" json:"created_at"`
+	UpdatedAt         time.Time `gorm:"default:now()" json:"updated_at"`
+
+	Charity           *Charity  `gorm:"foreignKey:CharityID" json:"charity,omitempty"`
 }
 
 type WebhookEvent struct {
-	ID         string    `gorm:"type:uuid;primaryKey" json:"id"`
-	Provider   string    `gorm:"type:varchar(50);not null;index:idx_wh_prov_proc" json:"provider"`
-	EventType  string    `gorm:"type:varchar(100);not null" json:"event_type"`
-	Payload    JSONB     `gorm:"type:jsonb;not null;default:'{}'" json:"payload"`
-	Processed  bool      `gorm:"not null;default:false;index:idx_wh_prov_proc" json:"processed"`
-	ReceivedAt time.Time `gorm:"autoCreateTime" json:"received_at"`
-}
-
-func (WebhookEvent) TableName() string {
-	return "webhook_events"
-}
-
-func (we *WebhookEvent) BeforeCreate(tx *gorm.DB) error {
-	if we.ID == "" {
-		we.ID = uuid.New().String()
-	}
-	if we.ReceivedAt.IsZero() {
-		we.ReceivedAt = time.Now().UTC()
-	}
-	return nil
-}
-
-type Charity struct {
-	ID                     string    `gorm:"type:uuid;primaryKey" json:"id"`
-	Name                   string    `gorm:"type:varchar(255);not null" json:"name"`
-	Category               string    `gorm:"type:varchar(100);not null" json:"category"`
-	Description            string    `gorm:"type:text;not null" json:"description"`
-	LogoURL                *string   `gorm:"type:varchar(500)" json:"logo_url,omitempty"`
-	IsActive               bool      `gorm:"not null;default:true;index" json:"is_active"`
-	RazorpayxFundAccountID *string   `gorm:"type:varchar(255)" json:"razorpayx_fund_account_id,omitempty"`
-	CreatedAt              time.Time `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt              time.Time `gorm:"autoUpdateTime" json:"updated_at"`
-}
-
-func (Charity) TableName() string {
-	return "charities"
-}
-
-func (ch *Charity) BeforeCreate(tx *gorm.DB) error {
-	if ch.ID == "" {
-		ch.ID = uuid.New().String()
-	}
-	now := time.Now().UTC()
-	if ch.CreatedAt.IsZero() {
-		ch.CreatedAt = now
-	}
-	if ch.UpdatedAt.IsZero() {
-		ch.UpdatedAt = now
-	}
-	return nil
+	ID             string    `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	Provider       string    `gorm:"type:varchar(50);not null" json:"provider"`
+	EventID        string    `gorm:"type:varchar(255);not null;uniqueIndex:uq_provider_event_id"`
+	EventType      string    `gorm:"type:varchar(100);not null" json:"event_type"`
+	Payload        JSONB     `gorm:"type:jsonb;not null" json:"payload"`
+	Processed      bool      `gorm:"default:false;not null" json:"processed"`
+	ProcessedError *string   `gorm:"type:text" json:"processed_error"`
+	ReceivedAt     time.Time `gorm:"default:now()" json:"received_at"`
+	CreatedAt      time.Time `gorm:"default:now()" json:"created_at"`
 }

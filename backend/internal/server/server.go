@@ -15,6 +15,7 @@ import (
 	"github.com/jaiswalshivang/pledgepay/internal/handlers"
 	"github.com/jaiswalshivang/pledgepay/internal/middleware"
 	"github.com/jaiswalshivang/pledgepay/internal/payment"
+	"github.com/jaiswalshivang/pledgepay/internal/payout"
 	"github.com/jaiswalshivang/pledgepay/internal/repository"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
@@ -56,6 +57,7 @@ func (s *Server) setupRoutes() {
 	var charityRepo repository.CharityRepository
 	var commitmentRepo repository.CommitmentRepository
 	var paymentRepo repository.PaymentRepository
+	var donationRepo repository.DonationRepository
 	var integrationRepo repository.IntegrationRepository
 	var evidenceRepo repository.EvidenceRepository
 	var verificationRepo repository.VerificationRepository
@@ -66,6 +68,7 @@ func (s *Server) setupRoutes() {
 		charityRepo = repository.NewCharityRepository(s.DB)
 		commitmentRepo = repository.NewCommitmentRepository(s.DB)
 		paymentRepo = repository.NewPaymentRepository(s.DB)
+		donationRepo = repository.NewDonationRepository(s.DB)
 		integrationRepo = repository.NewIntegrationRepository(s.DB)
 		evidenceRepo = repository.NewEvidenceRepository(s.DB)
 		verificationRepo = repository.NewVerificationRepository(s.DB)
@@ -74,6 +77,7 @@ func (s *Server) setupRoutes() {
 
 	groqClient := ai.NewGroqClient(s.Config.GroqAPIKey, s.Config.GroqModel)
 	razorpayClient := payment.NewRazorpayClient(s.Config.RazorpayKeyID, s.Config.RazorpayKeySecret)
+	razorpayXClient := payout.NewRazorpayXClient(s.Config.RazorpayKeyID, s.Config.RazorpayKeySecret, true)
 	githubClient := github.NewGitHubClient(s.Config.GitHubClientID, s.Config.GitHubClientSecret)
 
 	v1 := s.Router.Group("/api/v1")
@@ -145,6 +149,13 @@ func (s *Server) setupRoutes() {
 					commGroup.GET("/:id/progress", progressHandler.GetProgress)
 					commGroup.POST("/:id/verify", verificationHandler.VerifyCommitment)
 					commGroup.GET("/:id/verification", verificationHandler.GetLatestVerification)
+				}
+
+				if donationRepo != nil && evidenceRepo != nil && verificationRepo != nil {
+					resolver := payout.NewResolver(s.DB, razorpayXClient, commitmentRepo, charityRepo, donationRepo, evidenceRepo, verificationRepo)
+					resolutionHandler := handlers.NewResolutionHandler(resolver, commitmentRepo)
+					commGroup.GET("/:id/status", resolutionHandler.GetCommitmentStatus)
+					commGroup.POST("/:id/check-resolution", resolutionHandler.CheckResolution)
 				}
 			}
 		}
