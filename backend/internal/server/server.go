@@ -58,6 +58,7 @@ func (s *Server) setupRoutes() {
 	var paymentRepo repository.PaymentRepository
 	var integrationRepo repository.IntegrationRepository
 	var evidenceRepo repository.EvidenceRepository
+	var verificationRepo repository.VerificationRepository
 	var webhookRepo repository.WebhookRepository
 
 	if s.DB != nil {
@@ -67,6 +68,7 @@ func (s *Server) setupRoutes() {
 		paymentRepo = repository.NewPaymentRepository(s.DB)
 		integrationRepo = repository.NewIntegrationRepository(s.DB)
 		evidenceRepo = repository.NewEvidenceRepository(s.DB)
+		verificationRepo = repository.NewVerificationRepository(s.DB)
 		webhookRepo = repository.NewWebhookRepository(s.DB)
 	}
 
@@ -135,6 +137,11 @@ func (s *Server) setupRoutes() {
 					commGroup.POST("/:id/link-repo", integrationHandler.LinkRepo)
 					commGroup.POST("/:id/sync-evidence", integrationHandler.SyncEvidence)
 					commGroup.GET("/:id/evidence", integrationHandler.GetCommitmentEvidence)
+				}
+
+				if evidenceRepo != nil && verificationRepo != nil {
+					progressHandler := handlers.NewProgressHandler(commitmentRepo, evidenceRepo, verificationRepo)
+					commGroup.GET("/:id/progress", progressHandler.GetProgress)
 				}
 			}
 		}
