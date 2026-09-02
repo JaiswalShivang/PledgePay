@@ -2,49 +2,103 @@
 
 @layer base {
   :root {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 4.5%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 4.5%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 142 71% 45%;
-    --primary-foreground: 144 100% 97%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 18%;
-    --input: 240 3.7% 18%;
-    --ring: 142 71% 45%;
-    --radius: 0.65rem;
+    /* Palette Tokens: Ledger Precision + Human Impact */
+    --canvas-base: #0B0F17;
+    --canvas-subtle: #101622;
+    --canvas-raised: #151D2C;
+    --canvas-elevated: #1B2538;
+    --canvas-sunken: #070A0F;
+
+    --border-subtle: #1C273A;
+    --border-default: #25334C;
+    --border-strong: #334466;
+
+    --ink-primary: #F1F5F9;
+    --ink-secondary: #94A3B8;
+    --ink-muted: #64748B;
+    --ink-inverse: #0B0F17;
+
+    /* Primary: Ledger Mint (Precision, Proof, Verification) */
+    --pledge-primary: #10B981;
+    --pledge-hover: #059669;
+    --pledge-subtle: rgba(16, 185, 129, 0.12);
+    --pledge-border: rgba(16, 185, 129, 0.3);
+    --pledge-text: #34D399;
+
+    /* Secondary Accent: Impact Copper (Charity, Safety Net, Human Cause) */
+    --impact-primary: #E07A5F;
+    --impact-hover: #C9664D;
+    --impact-subtle: rgba(224, 122, 95, 0.12);
+    --impact-border: rgba(224, 122, 95, 0.35);
+    --impact-text: #F4A261;
+
+    /* Semantic Status Tokens */
+    --status-warning: #F59E0B;
+    --status-warning-subtle: rgba(245, 158, 11, 0.12);
+    --status-warning-border: rgba(245, 158, 11, 0.3);
+
+    --status-destructive: #EF4444;
+    --status-destructive-subtle: rgba(239, 68, 68, 0.12);
+    --status-destructive-border: rgba(239, 68, 68, 0.3);
+
+    --status-info: #3B82F6;
+    --status-info-subtle: rgba(59, 130, 246, 0.12);
+    --status-info-border: rgba(59, 130, 246, 0.3);
+
+    /* Radius Scale: Standardized 10px Core System */
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --radius-full: 9999px;
   }
 }
 
 body {
-  background-color: #090a0f;
-  color: #f3f4f6;
+  background-color: var(--canvas-base);
+  color: var(--ink-primary);
   font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-.glass-panel {
-  background: rgba(18, 20, 29, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+/* Tabular and data styling */
+.font-numeric {
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+  font-variant-numeric: tabular-nums;
 }
 
-.glass-panel:hover {
-  border-color: rgba(16, 185, 129, 0.3);
+/* Single Orchestrated Motion Moment: Hero Reveal */
+@keyframes heroEntry {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.glow-emerald {
-  box-shadow: 0 0 35px -5px rgba(16, 185, 129, 0.25);
+.animate-hero-reveal {
+  animation: heroEntry 450ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Clean structural utilities */
+.surface-raised {
+  background-color: var(--canvas-raised);
+  border: 1px solid var(--border-default);
+}
+
+.surface-sunken {
+  background-color: var(--canvas-sunken);
+  border: 1px solid var(--border-subtle);
+}
+
+.surface-elevated {
+  background-color: var(--canvas-elevated);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.4);
 }
