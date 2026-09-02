@@ -34,7 +34,6 @@ body {
   flex-direction: column;
 }
 
-/* Glassmorphic Utilities */
 .glass-panel {
   background: rgba(18, 20, 29, 0.7);
   backdrop-filter: blur(12px);

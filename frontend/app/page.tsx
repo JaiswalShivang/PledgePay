@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient, HealthResponse } from "@/lib/api-client";
+import { useAuth } from "@/hooks/use-auth";
 import {
   CheckCircle2,
   XCircle,
@@ -11,9 +13,11 @@ import {
   Cpu,
   Sparkles,
   Zap,
+  ArrowRight,
 } from "lucide-react";
 
 export default function Home() {
+  const { user, isAuthenticated } = useAuth();
   const {
     data: health,
     isLoading,
@@ -29,27 +33,51 @@ export default function Home() {
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
-      {/* Background glow effects */}
       <div className="absolute top-24 -z-10 h-72 w-72 rounded-full bg-emerald-500/10 blur-3xl" />
       <div className="absolute bottom-24 -z-10 h-80 w-80 rounded-full bg-blue-500/10 blur-3xl" />
 
       <div className="w-full max-w-4xl space-y-8">
-        {/* Header Hero */}
         <div className="text-center space-y-3">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium">
             <Sparkles className="h-3.5 w-3.5" />
-            <span>Prompt 0 — Infrastructure & Monorepo Scaffolding</span>
+            <span>PledgePay — Proof-of-Commitment Escrow</span>
           </div>
           <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-white">
-            Pledge<span className="text-emerald-400">Pay</span> Monorepo
+            Stake on your goals. <span className="text-emerald-400">Prove with code.</span>
           </h1>
           <p className="text-sm sm:text-base text-zinc-400 max-w-xl mx-auto">
-            High-concurrency proof-of-commitment escrow platform backed by Go,
-            Gin, PostgreSQL, Redis, Groq AI, and Next.js.
+            High-concurrency milestone escrow platform backed by Go, Gin, PostgreSQL, Redis, Groq AI, and Next.js.
           </p>
+
+          <div className="flex items-center justify-center gap-4 pt-2">
+            {isAuthenticated ? (
+              <Link
+                href="/profile"
+                className="glow-emerald inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400"
+              >
+                <span>Go to Profile ({user?.name})</span>
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/register"
+                  className="glow-emerald inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400"
+                >
+                  <span>Get Started</span>
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link
+                  href="/login"
+                  className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-zinc-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-800"
+                >
+                  <span>Sign In</span>
+                </Link>
+              </>
+            )}
+          </div>
         </div>
 
-        {/* Live Health & Acceptance Criteria Card */}
         <div className="glass-panel glow-emerald rounded-2xl p-6 sm:p-8 space-y-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/10 pb-5">
             <div>
@@ -74,7 +102,6 @@ export default function Home() {
             </button>
           </div>
 
-          {/* Health status banner */}
           <div className="flex items-center justify-between p-4 rounded-xl bg-zinc-900/80 border border-zinc-800">
             <div className="flex items-center gap-3">
               {isLoading ? (
@@ -116,7 +143,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Subsystem Details Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="p-4 rounded-xl bg-zinc-900/50 border border-zinc-800/80 space-y-1">
               <div className="flex items-center justify-between text-xs text-zinc-400">
@@ -164,7 +190,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Stack Architecture Badges */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center text-xs">
           <div className="p-3 rounded-lg bg-zinc-900/40 border border-zinc-800/60 text-zinc-300">
             <span className="font-semibold block text-white">Next.js 16</span>
