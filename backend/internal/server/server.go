@@ -10,6 +10,9 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/jaiswalshivang/pledgepay/internal/config"
+	"github.com/jaiswalshivang/pledgepay/internal/handlers"
+	"github.com/jaiswalshivang/pledgepay/internal/middleware"
+	"github.com/jaiswalshivang/pledgepay/internal/repository"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
@@ -45,6 +48,26 @@ func New(cfg *config.Config, db *gorm.DB, rdb *redis.Client) *Server {
 
 func (s *Server) setupRoutes() {
 	s.Router.GET("/healthz", s.handleHealthz)
+
+	var userRepo repository.UserRepository
+	if s.DB != nil {
+		userRepo = repository.NewUserRepository(s.DB)
+	}
+
+	v1 := s.Router.Group("/api/v1")
+	{
+		if userRepo != nil {
+			authHandler := handlers.NewAuthHandler(s.Config, userRepo)
+			authGroup := v1.Group("/auth")
+			{
+				authGroup.POST("/register", authHandler.Register)
+				authGroup.POST("/login", authHandler.Login)
+				authGroup.POST("/logout", authHandler.Logout)
+			}
+
+			v1.GET("/me", middleware.AuthRequired(s.Config.JWTSecret), authHandler.GetMe)
+		}
+	}
 }
 
 func (s *Server) handleHealthz(c *gin.Context) {
@@ -104,19 +127,22 @@ func structuredLoggerMiddleware() gin.HandlerFunc {
 }
 
 func corsMiddleware(allowedOriginsStr string) gin.HandlerFunc {
-	origins := []string{"*"}
+	origins := []string{"http://localhost:3000", "http://127.0.0.1:3000"}
 	if allowedOriginsStr != "" && allowedOriginsStr != "*" {
-		origins = strings.Split(allowedOriginsStr, ",")
-		for i := range origins {
-			origins[i] = strings.TrimSpace(origins[i])
+		parts := strings.Split(allowedOriginsStr, ",")
+		for _, p := range parts {
+			trimmed := strings.TrimSpace(p)
+			if trimmed != "" {
+				origins = append(origins, trimmed)
+			}
 		}
 	}
 
 	return cors.New(cors.Config{
 		AllowOrigins:     origins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With"},
-		ExposeHeaders:    []string{"Content-Length"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With", "Cookie"},
+		ExposeHeaders:    []string{"Content-Length", "Set-Cookie"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	})
