@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { AuthGuard } from "@/components/auth-guard";
 import {
   apiClient,
@@ -20,6 +21,10 @@ import {
   GitPullRequest,
   Check,
   ShieldAlert,
+  Coins,
+  Clock,
+  TrendingUp,
+  Flame,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -30,15 +35,20 @@ const PRESET_GOALS = [
   "Learn how to code better",
 ];
 
+const PLEDGE_PRESETS = [500, 1000, 2500, 5000];
+
 export default function NewCommitmentPage() {
+  const router = useRouter();
   const [inputText, setInputText] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [structuredGoal, setStructuredGoal] = useState<StructuredGoal | null>(null);
   const [qualityAnalysis, setQualityAnalysis] = useState<QualityAnalysis | null>(null);
   const [charitySuggestions, setCharitySuggestions] = useState<CharitySuggestion[]>([]);
   const [selectedCharityId, setSelectedCharityId] = useState<string | null>(null);
+  const [pledgeAmountINR, setPledgeAmountINR] = useState<number>(1000);
 
   const handleAnalyze = async (textToAnalyze?: string) => {
     const text = (textToAnalyze || inputText).trim();
@@ -72,6 +82,45 @@ export default function NewCommitmentPage() {
     handleAnalyze(rewriteText);
   };
 
+  const handleCreateCommitment = async () => {
+    if (!structuredGoal) {
+      setErrorMessage("Please analyze and structure your goal first.");
+      return;
+    }
+    if (!selectedCharityId) {
+      setErrorMessage("Please select a fallback charity for your pledge.");
+      return;
+    }
+    if (pledgeAmountINR < 1) {
+      setErrorMessage("Please enter a valid pledge amount.");
+      return;
+    }
+
+    setErrorMessage(null);
+    setIsCreating(true);
+
+    try {
+      const amountPaise = pledgeAmountINR * 100;
+      const res = await apiClient.commitments.create({
+        title: structuredGoal.goal,
+        target_count: structuredGoal.target,
+        unit: structuredGoal.unit,
+        duration_days: structuredGoal.duration,
+        evidence_type: structuredGoal.evidence || "github_activity",
+        amount_paise: amountPaise,
+        quality_score: qualityAnalysis?.overall,
+        charity_id: selectedCharityId,
+      });
+
+      router.push(`/commitments/${res.commitment.id}`);
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "Failed to create commitment draft";
+      setErrorMessage(msg);
+      setIsCreating(false);
+    }
+  };
+
   const getScoreColor = (score: number) => {
     if (score >= 80) return "text-emerald-400 border-emerald-500/30 bg-emerald-500/10";
     if (score >= 50) return "text-amber-400 border-amber-500/30 bg-amber-500/10";
@@ -83,6 +132,15 @@ export default function NewCommitmentPage() {
     if (score >= 50) return "bg-amber-500";
     return "bg-red-500";
   };
+
+  const selectedCharity = charitySuggestions.find(
+    (c) => c.charity_id === selectedCharityId
+  )?.charity;
+
+  const dailyPace =
+    structuredGoal && structuredGoal.duration > 0
+      ? (structuredGoal.target / structuredGoal.duration).toFixed(1)
+      : "0";
 
   return (
     <AuthGuard>
@@ -411,17 +469,97 @@ export default function NewCommitmentPage() {
           )}
 
           {structuredGoal && selectedCharityId && (
-            <div className="flex justify-end pt-4">
+            <div className="glass-panel glow-emerald rounded-2xl border border-white/10 p-6 space-y-6">
+              <div className="border-b border-white/10 pb-4">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Coins className="h-5 w-5 text-amber-400" />
+                  <span>Pledge Amount & Escrow Commitment Summary</span>
+                </h3>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Select your financial stake. 100% refunded upon verified goal completion.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-xs font-semibold uppercase tracking-wider text-zinc-300">
+                  Select Pledge Stake (₹ INR)
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {PLEDGE_PRESETS.map((amt) => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => setPledgeAmountINR(amt)}
+                      className={`py-2.5 rounded-xl border text-sm font-bold transition ${
+                        pledgeAmountINR === amt
+                          ? "border-emerald-500 bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/30"
+                          : "border-white/10 bg-zinc-900/60 text-zinc-300 hover:bg-zinc-800"
+                      }`}
+                    >
+                      ₹{amt.toLocaleString("en-IN")}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-zinc-900/80 p-5 border border-white/5 space-y-3">
+                <div className="flex items-center justify-between text-xs pb-2 border-b border-white/5">
+                  <span className="text-zinc-400 flex items-center gap-1.5">
+                    <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
+                    Required Daily Pace
+                  </span>
+                  <span className="font-semibold text-white font-mono">
+                    {dailyPace} {structuredGoal.unit} / day
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-xs pb-2 border-b border-white/5">
+                  <span className="text-zinc-400 flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5 text-blue-400" />
+                    Escrow Window
+                  </span>
+                  <span className="font-semibold text-white font-mono">
+                    {structuredGoal.duration} Days
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-xs pb-2 border-b border-white/5">
+                  <span className="text-zinc-400 flex items-center gap-1.5">
+                    <Heart className="h-3.5 w-3.5 text-rose-400" />
+                    Fallback Beneficiary
+                  </span>
+                  <span className="font-semibold text-emerald-300">
+                    {selectedCharity?.name || "Selected Charity"}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-sm font-bold text-white flex items-center gap-1.5">
+                    <Flame className="h-4 w-4 text-amber-400" />
+                    Total Escrow Stake
+                  </span>
+                  <span className="text-xl font-extrabold text-emerald-400 font-mono">
+                    ₹{pledgeAmountINR.toLocaleString("en-IN")}
+                  </span>
+                </div>
+              </div>
+
               <button
-                onClick={() => {
-                  alert(
-                    "Goal & Charity confirmed! The commitment creation & escrow payment flow activates in Prompt 4."
-                  );
-                }}
-                className="glow-emerald inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-6 py-3 font-semibold text-zinc-950 transition hover:bg-emerald-400"
+                onClick={handleCreateCommitment}
+                disabled={isCreating}
+                className="glow-emerald flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 py-3.5 font-bold text-zinc-950 transition hover:bg-emerald-400 disabled:opacity-50"
               >
-                <span>Proceed to Escrow Lock & Pledge</span>
-                <ArrowRight className="h-4 w-4" />
+                {isCreating ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span>Persisting Commitment Draft...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Create Commitment & Continue</span>
+                    <ArrowRight className="h-5 w-5" />
+                  </>
+                )}
               </button>
             </div>
           )}

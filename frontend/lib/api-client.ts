@@ -83,6 +83,47 @@ export interface AnalyzeCombinedResponse {
   charities: CharitySuggestion[];
 }
 
+export interface CommitmentRule {
+  id: string;
+  commitment_id: string;
+  rule_type: string;
+  rule_config: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface Commitment {
+  id: string;
+  user_id: string;
+  charity_id?: string;
+  title: string;
+  description?: string;
+  target_count: number;
+  unit: string;
+  duration_days: number;
+  start_date: string;
+  end_date: string;
+  evidence_type: string;
+  amount_paise: number;
+  status: "DRAFT" | "PAYMENT_PENDING" | "ACTIVE" | "VERIFYING" | "COMPLETED" | "FAILED";
+  quality_score?: number;
+  created_at: string;
+  updated_at: string;
+  charity?: Charity;
+  rules?: CommitmentRule[];
+}
+
+export interface CreateCommitmentInput {
+  title: string;
+  description?: string;
+  target_count: number;
+  unit: string;
+  duration_days: number;
+  evidence_type?: string;
+  amount_paise: number;
+  quality_score?: number;
+  charity_id: string;
+}
+
 export class ApiError extends Error {
   status: number;
   data: unknown;
@@ -251,6 +292,24 @@ export const apiClient = {
   charities: {
     list: () =>
       request<{ charities: Charity[] }>("/api/v1/charities", {
+        method: "GET",
+      }),
+  },
+
+  commitments: {
+    create: (input: CreateCommitmentInput) =>
+      request<{ commitment: Commitment }>("/api/v1/commitments", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+
+    list: () =>
+      request<{ commitments: Commitment[] }>("/api/v1/commitments", {
+        method: "GET",
+      }),
+
+    getById: (id: string) =>
+      request<{ commitment: Commitment }>(`/api/v1/commitments/${id}`, {
         method: "GET",
       }),
   },
