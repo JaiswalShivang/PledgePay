@@ -9,6 +9,7 @@ import {
   Commitment,
   EvidenceItem,
   GitHubRepoItem,
+  ProgressCalculation,
 } from "@/lib/api-client";
 import {
   Calendar,
@@ -31,6 +32,9 @@ import {
   GitBranch,
   ExternalLink,
   Check,
+  Target,
+  TrendingUp,
+  AlertTriangle,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -126,6 +130,15 @@ export default function CommitmentDetailPage({ params }: PageProps) {
     enabled: !!commitment && commitment.status === "ACTIVE",
   });
 
+  const { data: progressData, refetch: refetchProgress } = useQuery<ProgressCalculation>({
+    queryKey: ["progress", commitmentId],
+    queryFn: async () => {
+      const res = await apiClient.commitments.getProgress(commitmentId);
+      return res.progress;
+    },
+    enabled: !!commitment && commitment.status === "ACTIVE",
+  });
+
   const activeRepo =
     selectedRepo ||
     commitment?.github_repo ||
@@ -153,6 +166,7 @@ export default function CommitmentDetailPage({ params }: PageProps) {
     try {
       const res = await apiClient.commitments.syncEvidence(commitmentId);
       refetchEvidence();
+      refetchProgress();
       refetch();
       setSyncSuccessMsg(`Successfully synced ${res.synced_count} evidence items.`);
       setTimeout(() => setSyncSuccessMsg(null), 4000);
@@ -199,6 +213,7 @@ export default function CommitmentDetailPage({ params }: PageProps) {
               queryClient.setQueryData(["commitments", commitment.id], verifyRes.commitment);
               setPaymentStep("success");
               refetch();
+              refetchProgress();
             } catch (vErr: unknown) {
               const msg =
                 vErr instanceof Error ? vErr.message : "Payment signature verification failed";
@@ -233,6 +248,7 @@ export default function CommitmentDetailPage({ params }: PageProps) {
         queryClient.setQueryData(["commitments", commitment.id], verifyRes.commitment);
         setPaymentStep("success");
         refetch();
+        refetchProgress();
       }
     } catch (err: unknown) {
       const msg =
@@ -256,6 +272,29 @@ export default function CommitmentDetailPage({ params }: PageProps) {
         return "bg-rose-500/10 text-rose-400 border-rose-500/30";
       default:
         return "bg-zinc-800 text-zinc-300 border-white/10";
+    }
+  };
+
+  const getPaceStatusBadge = (status: "ON_TRACK" | "AT_RISK" | "BEHIND") => {
+    switch (status) {
+      case "ON_TRACK":
+        return {
+          bg: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
+          icon: <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />,
+          label: "ON TRACK",
+        };
+      case "AT_RISK":
+        return {
+          bg: "bg-amber-500/10 text-amber-400 border-amber-500/30",
+          icon: <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />,
+          label: "AT RISK",
+        };
+      case "BEHIND":
+        return {
+          bg: "bg-rose-500/10 text-rose-400 border-rose-500/30",
+          icon: <AlertCircle className="h-3.5 w-3.5 text-rose-400" />,
+          label: "BEHIND PACE",
+        };
     }
   };
 
@@ -375,6 +414,91 @@ export default function CommitmentDetailPage({ params }: PageProps) {
                   </div>
                 </div>
               </div>
+
+              {commitment.status === "ACTIVE" && progressData && (
+                <div className="glass-panel glow-emerald rounded-2xl border border-emerald-500/20 p-6 space-y-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-base font-bold text-white flex items-center gap-2">
+                          <Target className="h-4 w-4 text-emerald-400" />
+                          <span>Deterministic Progress Engine</span>
+                        </h3>
+                        {(() => {
+                          const badge = getPaceStatusBadge(progressData.status);
+                          return (
+                            <span
+                              className={`flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold font-mono uppercase ${badge.bg}`}
+                            >
+                              {badge.icon}
+                              <span>{badge.label}</span>
+                            </span>
+                          );
+                        })()}
+                      </div>
+                      <p className="text-xs text-zinc-400 mt-0.5">
+                        Mathematical evaluation: {progressData.verified} / {progressData.target} {commitment.unit} verified against rules.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-4 text-right">
+                      <div>
+                        <div className="text-[10px] uppercase text-zinc-500 font-mono">Completion</div>
+                        <div className="text-2xl font-black text-emerald-400 font-mono">
+                          {progressData.progress_pct}%
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="h-3 w-full rounded-full bg-zinc-900 overflow-hidden border border-white/5 p-0.5">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-700 shadow-lg shadow-emerald-500/30"
+                        style={{ width: `${progressData.progress_pct}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-zinc-400">
+                      <span>0 {commitment.unit}</span>
+                      <span className="font-mono text-zinc-300 font-semibold">
+                        {progressData.verified} of {progressData.target} {commitment.unit}
+                      </span>
+                      <span>{progressData.target} {commitment.unit}</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                    <div className="rounded-xl bg-zinc-900/60 p-3 border border-white/5">
+                      <div className="text-[10px] uppercase text-zinc-400 font-mono">Verified Items</div>
+                      <div className="text-base font-bold text-emerald-400 font-mono mt-0.5">
+                        {progressData.verified}
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl bg-zinc-900/60 p-3 border border-white/5">
+                      <div className="text-[10px] uppercase text-zinc-400 font-mono">Days Remaining</div>
+                      <div className="text-base font-bold text-white font-mono mt-0.5 flex items-center gap-1">
+                        <Clock className="h-3.5 w-3.5 text-blue-400" />
+                        <span>{progressData.days_remaining}d</span>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl bg-zinc-900/60 p-3 border border-white/5">
+                      <div className="text-[10px] uppercase text-zinc-400 font-mono">Actual Daily Pace</div>
+                      <div className="text-base font-bold text-white font-mono mt-0.5">
+                        {progressData.daily_pace_actual} <span className="text-xs font-normal text-zinc-500">/day</span>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl bg-zinc-900/60 p-3 border border-white/5">
+                      <div className="text-[10px] uppercase text-zinc-400 font-mono">Required Pace</div>
+                      <div className="text-base font-bold text-zinc-300 font-mono mt-0.5">
+                        {progressData.daily_pace_required} <span className="text-xs font-normal text-zinc-500">/day</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="rounded-xl bg-zinc-900/50 p-3.5 border border-white/5">

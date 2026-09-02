@@ -111,6 +111,19 @@ export interface EvidenceItem {
   ingested_at: string;
 }
 
+export type PaceStatus = "ON_TRACK" | "AT_RISK" | "BEHIND";
+
+export interface ProgressCalculation {
+  target: number;
+  verified: number;
+  progress_pct: number;
+  days_remaining: number;
+  status: PaceStatus;
+  evidence_count: number;
+  daily_pace_actual: number;
+  daily_pace_required: number;
+}
+
 export interface Commitment {
   id: string;
   user_id: string;
@@ -383,6 +396,14 @@ export const apiClient = {
     getEvidence: (id: string) =>
       request<{ evidence: EvidenceItem[] }>(
         `/api/v1/commitments/${id}/evidence`,
+        {
+          method: "GET",
+        }
+      ),
+
+    getProgress: (id: string) =>
+      request<{ progress: ProgressCalculation }>(
+        `/api/v1/commitments/${id}/progress`,
         {
           method: "GET",
         }
