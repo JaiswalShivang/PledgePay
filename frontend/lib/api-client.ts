@@ -124,6 +124,24 @@ export interface CreateCommitmentInput {
   charity_id: string;
 }
 
+export interface CreateOrderResponse {
+  commitment_id: string;
+  razorpay_order_id: string;
+  amount_paise: number;
+  currency: string;
+  key_id: string;
+  is_mock?: boolean;
+  mock_payment_id?: string;
+  mock_signature?: string;
+}
+
+export interface VerifyPaymentInput {
+  commitment_id: string;
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+}
+
 export class ApiError extends Error {
   status: number;
   data: unknown;
@@ -312,5 +330,22 @@ export const apiClient = {
       request<{ commitment: Commitment }>(`/api/v1/commitments/${id}`, {
         method: "GET",
       }),
+  },
+
+  payments: {
+    createOrder: (commitmentId: string) =>
+      request<CreateOrderResponse>("/api/v1/payments/create-order", {
+        method: "POST",
+        body: JSON.stringify({ commitment_id: commitmentId }),
+      }),
+
+    verify: (input: VerifyPaymentInput) =>
+      request<{ status: string; commitment: Commitment }>(
+        "/api/v1/payments/verify",
+        {
+          method: "POST",
+          body: JSON.stringify(input),
+        }
+      ),
   },
 };

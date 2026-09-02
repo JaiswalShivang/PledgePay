@@ -1,7 +1,7 @@
 "use client";
 
-import { use } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { use, useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { AuthGuard } from "@/components/auth-guard";
 import { apiClient, Commitment } from "@/lib/api-client";
@@ -17,8 +17,42 @@ import {
   AlertCircle,
   CreditCard,
   Lock,
+  CheckCircle2,
+  ShieldCheck,
+  Flame,
+  Zap,
 } from "lucide-react";
 import Image from "next/image";
+
+interface RazorpayOptions {
+  key: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  order_id: string;
+  handler: (response: {
+    razorpay_payment_id: string;
+    razorpay_order_id: string;
+    razorpay_signature: string;
+  }) => void;
+  theme?: {
+    color?: string;
+  };
+  modal?: {
+    ondismiss?: () => void;
+  };
+}
+
+interface RazorpayInstance {
+  open: () => void;
+}
+
+declare global {
+  interface Window {
+    Razorpay?: new (options: RazorpayOptions) => RazorpayInstance;
+  }
+}
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -27,12 +61,29 @@ interface PageProps {
 export default function CommitmentDetailPage({ params }: PageProps) {
   const resolvedParams = use(params);
   const commitmentId = resolvedParams.id;
+  const queryClient = useQueryClient();
+
+  const [paymentStep, setPaymentStep] = useState<
+    "idle" | "creating_order" | "processing_payment" | "verifying" | "success" | "error"
+  >("idle");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && !document.getElementById("razorpay-checkout-script")) {
+      const script = document.createElement("script");
+      script.id = "razorpay-checkout-script";
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, []);
 
   const {
     data: commitment,
     isLoading,
     isError,
     error,
+    refetch,
   } = useQuery<Commitment>({
     queryKey: ["commitments", commitmentId],
     queryFn: async () => {
@@ -41,6 +92,84 @@ export default function CommitmentDetailPage({ params }: PageProps) {
     },
     enabled: !!commitmentId,
   });
+
+  const handlePledgePayment = async () => {
+    if (!commitment) return;
+
+    setErrorMessage(null);
+    setPaymentStep("creating_order");
+
+    try {
+      const orderData = await apiClient.payments.createOrder(commitment.id);
+      setPaymentStep("processing_payment");
+
+      if (typeof window !== "undefined" && window.Razorpay && !orderData.is_mock) {
+        const options: RazorpayOptions = {
+          key: orderData.key_id,
+          amount: orderData.amount_paise,
+          currency: orderData.currency,
+          name: "PledgePay Escrow",
+          description: `Pledge for: ${commitment.title}`,
+          order_id: orderData.razorpay_order_id,
+          handler: async function (response: {
+            razorpay_payment_id: string;
+            razorpay_order_id: string;
+            razorpay_signature: string;
+          }) {
+            setPaymentStep("verifying");
+            try {
+              const verifyRes = await apiClient.payments.verify({
+                commitment_id: commitment.id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              });
+
+              queryClient.setQueryData(["commitments", commitment.id], verifyRes.commitment);
+              setPaymentStep("success");
+              refetch();
+            } catch (vErr: unknown) {
+              const msg =
+                vErr instanceof Error ? vErr.message : "Payment signature verification failed";
+              setErrorMessage(msg);
+              setPaymentStep("error");
+            }
+          },
+          theme: {
+            color: "#10b981",
+          },
+          modal: {
+            ondismiss: function () {
+              setPaymentStep("idle");
+            },
+          },
+        };
+
+        const rzp = new window.Razorpay(options);
+        rzp.open();
+      } else {
+        setPaymentStep("verifying");
+        const mockPayID = orderData.mock_payment_id || `pay_mock_${Date.now()}`;
+        const mockSig = orderData.mock_signature || `sig_mock_${Date.now()}`;
+
+        const verifyRes = await apiClient.payments.verify({
+          commitment_id: commitment.id,
+          razorpay_order_id: orderData.razorpay_order_id,
+          razorpay_payment_id: mockPayID,
+          razorpay_signature: mockSig,
+        });
+
+        queryClient.setQueryData(["commitments", commitment.id], verifyRes.commitment);
+        setPaymentStep("success");
+        refetch();
+      }
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "Failed to initiate payment order";
+      setErrorMessage(msg);
+      setPaymentStep("error");
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -104,6 +233,38 @@ export default function CommitmentDetailPage({ params }: PageProps) {
             </div>
           ) : (
             <div className="space-y-6">
+              {errorMessage && (
+                <div className="flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
+                  <AlertCircle className="h-5 w-5 shrink-0 text-red-400" />
+                  <div>
+                    <div className="font-semibold">Payment Error</div>
+                    <div className="text-xs text-red-300/90 mt-0.5">{errorMessage}</div>
+                  </div>
+                </div>
+              )}
+
+              {commitment.status === "ACTIVE" && (
+                <div className="glass-panel glow-emerald flex items-center justify-between rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-5">
+                  <div className="flex items-center gap-3.5">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500 text-zinc-950 font-bold">
+                      <ShieldCheck className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-white flex items-center gap-2">
+                        <span>Escrow Locked & Commitment Active</span>
+                        <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                      </div>
+                      <p className="text-xs text-emerald-200/80 mt-0.5">
+                        Your ₹{amountINR.toLocaleString("en-IN")} stake is secured in smart escrow. Evidence polling and progress evaluation active.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="hidden sm:inline-block rounded-lg bg-emerald-500/20 px-3 py-1 text-xs font-mono font-bold text-emerald-300 border border-emerald-500/30">
+                    VERIFIED ACTIVE
+                  </span>
+                </div>
+              )}
+
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2 mb-1.5">
@@ -209,30 +370,62 @@ export default function CommitmentDetailPage({ params }: PageProps) {
                 </div>
               )}
 
-              {commitment.status === "DRAFT" && (
-                <div className="glass-panel glow-emerald rounded-2xl border border-white/10 p-6 space-y-4">
+              {commitment.status !== "ACTIVE" && commitment.status !== "COMPLETED" && (
+                <div className="glass-panel glow-emerald rounded-2xl border border-white/10 p-6 space-y-5">
                   <div className="flex items-start justify-between">
                     <div>
                       <h3 className="text-base font-bold text-white flex items-center gap-2">
                         <Lock className="h-4 w-4 text-emerald-400" />
-                        <span>Ready to Lock in Escrow?</span>
+                        <span>Authorize Escrow & Lock Pledge</span>
                       </h3>
                       <p className="text-xs text-zinc-400 mt-1">
-                        Your draft commitment is saved. Next, authorize and lock your pledge stake via Razorpay payment escrow.
+                        Deposit your stake into the PledgePay verified escrow via Razorpay Test Mode. 100% refunded when you achieve your goal.
                       </p>
                     </div>
                   </div>
 
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="flex items-center gap-3 rounded-xl bg-zinc-900/60 p-3 border border-white/5 text-xs text-zinc-300">
+                      <Zap className="h-4 w-4 text-emerald-400 shrink-0" />
+                      <span>Instant automated refund upon milestone completion</span>
+                    </div>
+                    <div className="flex items-center gap-3 rounded-xl bg-zinc-900/60 p-3 border border-white/5 text-xs text-zinc-300">
+                      <Flame className="h-4 w-4 text-rose-400 shrink-0" />
+                      <span>Zero fee routing to chosen charity on failure</span>
+                    </div>
+                  </div>
+
                   <button
-                    onClick={() => {
-                      alert(
-                        "Razorpay Escrow payment gateway integration activates in Prompt 5!"
-                      );
-                    }}
-                    className="glow-emerald flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 py-3 font-bold text-zinc-950 transition hover:bg-emerald-400"
+                    onClick={handlePledgePayment}
+                    disabled={paymentStep !== "idle" && paymentStep !== "error"}
+                    className="glow-emerald flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 py-3.5 font-bold text-zinc-950 transition hover:bg-emerald-400 disabled:opacity-50"
                   >
-                    <CreditCard className="h-4 w-4" />
-                    <span>Authorize & Pledge ₹{amountINR.toLocaleString("en-IN")}</span>
+                    {paymentStep === "creating_order" ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span>Initializing Razorpay Order...</span>
+                      </>
+                    ) : paymentStep === "processing_payment" ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span>Processing Payment in Razorpay...</span>
+                      </>
+                    ) : paymentStep === "verifying" ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span>Verifying HMAC Signature Server-Side...</span>
+                      </>
+                    ) : paymentStep === "success" ? (
+                      <>
+                        <CheckCircle2 className="h-5 w-5 text-zinc-950" />
+                        <span>Payment Verified! Commitment Active</span>
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="h-4 w-4" />
+                        <span>Pledge & Authorize ₹{amountINR.toLocaleString("en-IN")} Escrow</span>
+                      </>
+                    )}
                   </button>
                 </div>
               )}
