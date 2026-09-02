@@ -4,6 +4,7 @@ import { use, useState, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { AuthGuard } from "@/components/auth-guard";
+import { DemoControls } from "@/components/demo-controls";
 import {
   apiClient,
   Commitment,
@@ -1193,6 +1194,7 @@ export default function CommitmentDetailPage({ params }: PageProps) {
             </div>
           )}
         </div>
+        <DemoControls commitmentId={commitmentId} />
       </div>
     </AuthGuard>
   );

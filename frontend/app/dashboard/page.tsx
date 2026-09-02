@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { AuthGuard } from "@/components/auth-guard";
+import { DemoControls } from "@/components/demo-controls";
 import { apiClient, DashboardResponse, DashboardItem } from "@/lib/api-client";
 import {
   Target,
@@ -328,6 +329,7 @@ export default function DashboardPage() {
             })}
           </div>
         )}
+        <DemoControls />
       </div>
     </AuthGuard>
   );

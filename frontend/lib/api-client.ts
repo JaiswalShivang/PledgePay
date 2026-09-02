@@ -513,6 +513,45 @@ export const apiClient = {
       ),
   },
 
+  dev: {
+    resetDemo: () =>
+      request<{
+        message: string;
+        primary_commitment_id: string;
+        second_commitment_id: string;
+      }>("/api/v1/dev/reset-demo", {
+        method: "POST",
+      }),
+
+    injectAnomaly: (commitmentId?: string) =>
+      request<{
+        message: string;
+        commitment_id: string;
+        anomaly_flag: boolean;
+      }>("/api/v1/dev/inject-anomaly", {
+        method: "POST",
+        body: JSON.stringify({ commitment_id: commitmentId }),
+      }),
+
+    forceSuccess: (commitmentId?: string) =>
+      request<{
+        message: string;
+        resolution: ResolutionResult;
+      }>("/api/v1/dev/force-success", {
+        method: "POST",
+        body: JSON.stringify({ commitment_id: commitmentId }),
+      }),
+
+    forceFailure: (commitmentId?: string) =>
+      request<{
+        message: string;
+        resolution: ResolutionResult;
+      }>("/api/v1/dev/force-failure", {
+        method: "POST",
+        body: JSON.stringify({ commitment_id: commitmentId }),
+      }),
+  },
+
   payments: {
     createOrder: (commitmentId: string) =>
       request<CreateOrderResponse>("/api/v1/payments/create-order", {
