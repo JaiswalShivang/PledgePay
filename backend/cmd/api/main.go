@@ -19,7 +19,6 @@ import (
 )
 
 func main() {
-	// Initialize structured logger
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	}))
@@ -27,14 +26,11 @@ func main() {
 
 	slog.Info("Starting PledgePay Backend API Service")
 
-	// Load configuration
 	cfg := config.Load()
 
-	// Root context with cancellation for graceful shutdown
 	rootCtx, rootCancel := context.WithCancel(context.Background())
 	defer rootCancel()
 
-	// Connect to PostgreSQL (log warning if offline during initial boot, but allow server startup)
 	var gormDB *gorm.DB
 	var err error
 	gormDB, err = db.InitPostgres(cfg.DatabaseURL)
@@ -42,14 +38,12 @@ func main() {
 		slog.Warn("PostgreSQL connection failed at boot (service will run with limited features)", "error", err)
 	}
 
-	// Connect to Redis
 	var rdb *redis.Client
 	rdb, err = db.InitRedis(cfg.RedisURL)
 	if err != nil {
 		slog.Warn("Redis connection failed at boot (service will run with limited features)", "error", err)
 	}
 
-	// Initialize Gin Server
 	srvInstance := server.New(cfg, gormDB, rdb)
 
 	httpServer := &http.Server{
@@ -60,7 +54,6 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	// Run HTTP Server in a background goroutine
 	go func() {
 		slog.Info("Server listening on port", "port", cfg.Port)
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -69,37 +62,31 @@ func main() {
 		}
 	}()
 
-	// Listen for shutdown signals (SIGINT, SIGTERM)
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 
 	sig := <-quit
 	slog.Info("Received shutdown signal, initiating graceful shutdown...", "signal", sig.String())
 
-	// Cancel root context to signal all background goroutines
 	rootCancel()
 
-	// Create shutdown context with 10s deadline
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer shutdownCancel()
 
-	// Gracefully shutdown HTTP server
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
 		slog.Error("Server forced to shutdown", "error", err)
 	}
 
-	// Close database connections
 	if gormDB != nil {
 		if sqlDB, err := gormDB.DB(); err == nil {
 			_ = sqlDB.Close()
 		}
 	}
 
-	// Close Redis connection
 	if rdb != nil {
 		_ = rdb.Close()
 	}
 
 	slog.Info("PledgePay API server exited cleanly", "timestamp", time.Now().UTC().Format(time.RFC3339))
-	_ = rootCtx // rootCtx used for lifecycle
+	_ = rootCtx
 }
