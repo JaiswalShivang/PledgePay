@@ -141,7 +141,10 @@ func (s *Server) setupRoutes() {
 
 				if evidenceRepo != nil && verificationRepo != nil {
 					progressHandler := handlers.NewProgressHandler(commitmentRepo, evidenceRepo, verificationRepo)
+					verificationHandler := handlers.NewVerificationHandler(groqClient, commitmentRepo, evidenceRepo, verificationRepo)
 					commGroup.GET("/:id/progress", progressHandler.GetProgress)
+					commGroup.POST("/:id/verify", verificationHandler.VerifyCommitment)
+					commGroup.GET("/:id/verification", verificationHandler.GetLatestVerification)
 				}
 			}
 		}
