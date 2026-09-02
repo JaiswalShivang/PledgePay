@@ -15,37 +15,25 @@ import {
   ResolutionResult,
 } from "@/lib/api-client";
 import {
-  Calendar,
-  Coins,
-  Heart,
-  GitPullRequest,
-  Clock,
+  Button,
+  Badge,
+  Alert,
+} from "@/components/ui";
+import {
   ArrowLeft,
-  Sparkles,
-  Loader2,
-  AlertCircle,
-  CreditCard,
-  Lock,
-  CheckCircle2,
   ShieldCheck,
-  Flame,
-  Zap,
-  RefreshCw,
-  GitCommit,
-  GitBranch,
-  ExternalLink,
-  Check,
-  Target,
-  TrendingUp,
-  AlertTriangle,
-  Bot,
-  BrainCircuit,
-  Trophy,
   Award,
-  Send,
-  MessageSquare,
 } from "lucide-react";
-import Image from "next/image";
+import {
+  AnomalyBanner,
+  ResolutionBanner,
+  EscrowPaymentCard,
+  ProgressVerificationPanel,
+  CoachChatPanel,
+  EvidenceFeed,
+  CharityCard,
+  CoachMessage,
+} from "@/components/commitment-detail";
 
 interface RazorpayOptions {
   key: string;
@@ -81,13 +69,6 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-interface CoachMessage {
-  id: string;
-  sender: "user" | "coach";
-  text: string;
-  timestamp: string;
-}
-
 export default function CommitmentDetailPage({ params }: PageProps) {
   const resolvedParams = use(params);
   const commitmentId = resolvedParams.id;
@@ -105,7 +86,6 @@ export default function CommitmentDetailPage({ params }: PageProps) {
   const [isResolving, setIsResolving] = useState(false);
   const [syncSuccessMsg, setSyncSuccessMsg] = useState<string | null>(null);
 
-  const [coachInput, setCoachInput] = useState("");
   const [isAskingCoach, setIsAskingCoach] = useState(false);
   const msgCounter = useRef(1);
   const [coachMessages, setCoachMessages] = useState<CoachMessage[]>([
@@ -264,23 +244,21 @@ export default function CommitmentDetailPage({ params }: PageProps) {
     }
   };
 
-  const handleAskCoach = async (questionToAsk?: string) => {
-    const q = questionToAsk || coachInput;
-    if (!q.trim()) return;
+  const handleAskCoach = async (questionText: string) => {
+    if (!questionText.trim()) return;
 
     const userMsg: CoachMessage = {
       id: `user_msg_${msgCounter.current++}`,
       sender: "user",
-      text: q.trim(),
+      text: questionText.trim(),
       timestamp: "Just now",
     };
 
     setCoachMessages((prev) => [...prev, userMsg]);
-    setCoachInput("");
     setIsAskingCoach(true);
 
     try {
-      const res = await apiClient.commitments.askCoach(commitmentId, q.trim());
+      const res = await apiClient.commitments.askCoach(commitmentId, questionText.trim());
       const coachMsg: CoachMessage = {
         id: `coach_msg_${msgCounter.current++}`,
         sender: "coach",
@@ -322,11 +300,7 @@ export default function CommitmentDetailPage({ params }: PageProps) {
           name: "PledgePay Escrow",
           description: `Pledge for: ${commitment.title}`,
           order_id: orderData.razorpay_order_id,
-          handler: async function (response: {
-            razorpay_payment_id: string;
-            razorpay_order_id: string;
-            razorpay_signature: string;
-          }) {
+          handler: async function (response) {
             setPaymentStep("verifying");
             try {
               const verifyRes = await apiClient.payments.verify({
@@ -350,7 +324,7 @@ export default function CommitmentDetailPage({ params }: PageProps) {
             }
           },
           theme: {
-            color: "#10b981",
+            color: "#047857",
           },
           modal: {
             ondismiss: function () {
@@ -388,816 +362,186 @@ export default function CommitmentDetailPage({ params }: PageProps) {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "ACTIVE":
-        return "bg-emerald-500/10 text-emerald-400 border-emerald-500/30";
-      case "DRAFT":
-        return "bg-amber-500/10 text-amber-400 border-amber-500/30";
-      case "PAYMENT_PENDING":
-        return "bg-blue-500/10 text-blue-400 border-blue-500/30";
-      case "COMPLETED":
-        return "bg-purple-500/10 text-purple-400 border-purple-500/30";
-      case "FAILED":
-        return "bg-rose-500/10 text-rose-400 border-rose-500/30";
-      default:
-        return "bg-zinc-800 text-zinc-300 border-white/10";
-    }
-  };
-
-  const getPaceStatusBadge = (status: "ON_TRACK" | "AT_RISK" | "BEHIND") => {
-    switch (status) {
-      case "ON_TRACK":
-        return {
-          bg: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
-          icon: <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />,
-          label: "ON TRACK",
-        };
-      case "AT_RISK":
-        return {
-          bg: "bg-amber-500/10 text-amber-400 border-amber-500/30",
-          icon: <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />,
-          label: "AT RISK",
-        };
-      case "BEHIND":
-        return {
-          bg: "bg-rose-500/10 text-rose-400 border-rose-500/30",
-          icon: <AlertCircle className="h-3.5 w-3.5 text-rose-400" />,
-          label: "BEHIND PACE",
-        };
-    }
-  };
-
   const amountINR = commitment ? commitment.amount_paise / 100 : 0;
-  const startDateStr = commitment?.start_date
-    ? new Date(commitment.start_date).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      })
-    : "";
-  const endDateStr = commitment?.end_date
-    ? new Date(commitment.end_date).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      })
-    : "";
-
   const isResolved =
     commitment?.status === "COMPLETED" ||
     commitment?.status === "FAILED" ||
     statusData?.is_resolved ||
     !!statusData?.donation;
 
-  const isSuccessOutcome =
-    commitment?.status === "COMPLETED" || statusData?.donation?.outcome === "SUCCESS";
-
-  const donation = statusData?.donation || commitment?.donation;
-
   return (
     <AuthGuard>
-      <div className="container mx-auto max-w-4xl px-4 py-10">
-        <div className="mb-6">
+      <div className="container mx-auto max-w-5xl px-4 py-8 space-y-6">
+        {/* Navigation Breadcrumb */}
+        <div>
           <Link
             href="/dashboard"
-            className="inline-flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition mb-3"
+            className="inline-flex items-center gap-1 text-xs text-[#52525B] hover:text-[#18181B] transition-colors"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             <span>Back to Dashboard</span>
           </Link>
+        </div>
 
-          {isLoading ? (
-            <div className="flex items-center gap-3 py-6">
-              <Loader2 className="h-6 w-6 animate-spin text-emerald-400" />
-              <span className="text-sm text-zinc-400">Loading commitment...</span>
-            </div>
-          ) : isError || !commitment ? (
-            <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-5 text-sm text-red-300 flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 shrink-0 text-red-400" />
+        {isLoading ? (
+          <div className="h-64 rounded-[8px] bg-white border border-[#E4E7EB] animate-pulse flex items-center justify-center text-xs text-[#71717A]">
+            Loading commitment ledger...
+          </div>
+        ) : isError || !commitment ? (
+          <Alert variant="destructive" title="Commitment Not Found">
+            {(error as Error)?.message || "You do not have access to view this commitment."}
+          </Alert>
+        ) : (
+          <div className="space-y-6">
+            {errorMessage && (
+              <Alert variant="destructive" title="Operation Error">
+                {errorMessage}
+              </Alert>
+            )}
+
+            {syncSuccessMsg && (
+              <Alert variant="success">
+                {syncSuccessMsg}
+              </Alert>
+            )}
+
+            {/* Resolution Banner */}
+            {isResolved && (
+              <ResolutionBanner commitment={commitment} statusData={statusData} />
+            )}
+
+            {/* Active Escrow Custody Banner */}
+            {commitment.status === "ACTIVE" && (
+              <div className="p-4 rounded-[8px] bg-[#ECFDF5] border border-[#A7F3D0] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <ShieldCheck className="h-5 w-5 text-[#047857] shrink-0" />
+                  <div>
+                    <div className="text-xs font-semibold text-[#065F46]">
+                      Escrow Locked & Polling Active
+                    </div>
+                    <p className="text-xs text-[#047857]">
+                      ₹{amountINR.toLocaleString("en-IN")} stake is secured in smart escrow.
+                    </p>
+                  </div>
+                </div>
+
+                <Button
+                  onClick={handleCheckResolution}
+                  variant="secondary"
+                  size="sm"
+                  isLoading={isResolving}
+                  leftIcon={<Award className="h-3.5 w-3.5 text-[#047857]" />}
+                >
+                  Check Resolution
+                </Button>
+              </div>
+            )}
+
+            {/* Anomaly Detection Banner */}
+            {verificationData?.anomaly_flag && (
+              <AnomalyBanner reason={verificationData.anomaly_reason} />
+            )}
+
+            {/* Title & Stake Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#E4E7EB]">
               <div>
-                <h3 className="font-bold">Commitment Not Found</h3>
-                <p className="mt-1 text-xs text-red-300/80">
-                  {(error as Error)?.message || "You do not have access to view this commitment."}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {errorMessage && (
-                <div className="flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
-                  <AlertCircle className="h-5 w-5 shrink-0 text-red-400" />
-                  <div>
-                    <div className="font-semibold">Error</div>
-                    <div className="text-xs text-red-300/90 mt-0.5">{errorMessage}</div>
-                  </div>
-                </div>
-              )}
-
-              {syncSuccessMsg && (
-                <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-xs font-semibold text-emerald-300">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                  <span>{syncSuccessMsg}</span>
-                </div>
-              )}
-
-              {isResolved && isSuccessOutcome && (
-                <div className="glass-panel glow-emerald rounded-2xl border border-emerald-500/40 bg-gradient-to-br from-emerald-950/40 via-zinc-900/60 to-zinc-950/80 p-6 sm:p-8 space-y-6 text-center">
-                  <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-zinc-950 shadow-xl shadow-emerald-500/20">
-                    <Trophy className="h-8 w-8" />
-                  </div>
-                  <div className="space-y-2 max-w-xl mx-auto">
-                    <span className="inline-block rounded-full bg-emerald-500/20 px-3.5 py-1 text-xs font-mono font-bold text-emerald-300 border border-emerald-500/30">
-                      🎉 COMMITMENT COMPLETED & VERIFIED
-                    </span>
-                    <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-                      Target Achieved. Real Impact Created.
-                    </h2>
-                    <p className="text-sm text-zinc-300 leading-relaxed">
-                      You met your goal of {commitment.target_count} {commitment.unit}! Your stake of ₹{amountINR.toLocaleString("en-IN")} was automatically routed as a verified donation to <span className="font-bold text-emerald-300">{commitment.charity?.name}</span>.
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-left">
-                    <div className="rounded-xl bg-zinc-900/80 p-4 border border-white/5">
-                      <div className="text-[10px] uppercase font-mono text-zinc-400">Verified Evidence</div>
-                      <div className="text-lg font-bold text-emerald-400 font-mono mt-1">
-                        {statusData?.progress?.verified || commitment.target_count} / {commitment.target_count} {commitment.unit}
-                      </div>
-                      <div className="text-[11px] text-zinc-500 mt-0.5">100% Milestone Achieved</div>
-                    </div>
-
-                    <div className="rounded-xl bg-zinc-900/80 p-4 border border-white/5">
-                      <div className="text-[10px] uppercase font-mono text-zinc-400">Impact Beneficiary</div>
-                      <div className="text-base font-bold text-white mt-1 truncate">
-                        {commitment.charity?.name}
-                      </div>
-                      <div className="text-[11px] text-emerald-400 flex items-center gap-1 mt-0.5 font-semibold">
-                        <CheckCircle2 className="h-3 w-3" />
-                        <span>DONATED ₹{amountINR.toLocaleString("en-IN")}</span>
-                      </div>
-                    </div>
-
-                    <div className="rounded-xl bg-zinc-900/80 p-4 border border-white/5">
-                      <div className="text-[10px] uppercase font-mono text-zinc-400">RazorpayX Payout Ref</div>
-                      <div className="text-xs font-mono text-zinc-300 mt-1 truncate">
-                        {donation?.razorpayx_payout_id || "pout_test_verified_success"}
-                      </div>
-                      {commitment.charity?.website_url && (
-                        <a
-                          href={commitment.charity.website_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-[11px] text-emerald-400 hover:underline flex items-center gap-1 mt-0.5"
-                        >
-                          <span>Visit Charity</span>
-                          <ExternalLink className="h-3 w-3" />
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {isResolved && !isSuccessOutcome && (
-                <div className="glass-panel rounded-2xl border border-blue-500/30 bg-gradient-to-br from-zinc-900/80 via-zinc-900/40 to-zinc-950/80 p-6 sm:p-8 space-y-6 text-center">
-                  <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-zinc-800 text-rose-400 border border-white/10 shadow-lg">
-                    <Heart className="h-8 w-8 text-rose-400" />
-                  </div>
-                  <div className="space-y-2 max-w-xl mx-auto">
-                    <span className="inline-block rounded-full bg-blue-500/10 px-3.5 py-1 text-xs font-mono font-bold text-blue-300 border border-blue-500/20">
-                      RESOLVED • IMPACT CREATED
-                    </span>
-                    <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-                      You didn&apos;t hit the full target — but your pledge still helped.
-                    </h2>
-                    <p className="text-sm text-zinc-300 leading-relaxed">
-                      Every pledge creates real positive impact. Your ₹{amountINR.toLocaleString("en-IN")} stake has been securely transferred via RazorpayX directly to <span className="font-bold text-white">{commitment.charity?.name}</span> to support their mission.
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-left">
-                    <div className="rounded-xl bg-zinc-900/80 p-4 border border-white/5">
-                      <div className="text-[10px] uppercase font-mono text-zinc-400">Final Progress</div>
-                      <div className="text-lg font-bold text-zinc-200 font-mono mt-1">
-                        {statusData?.progress?.verified || 0} / {commitment.target_count} {commitment.unit}
-                      </div>
-                      <div className="text-[11px] text-zinc-500 mt-0.5">Resolved on Deadline</div>
-                    </div>
-
-                    <div className="rounded-xl bg-zinc-900/80 p-4 border border-white/5">
-                      <div className="text-[10px] uppercase font-mono text-zinc-400">Donation Status</div>
-                      <div className="text-base font-bold text-white mt-1 truncate">
-                        {commitment.charity?.name}
-                      </div>
-                      <div className="text-[11px] text-emerald-400 flex items-center gap-1 mt-0.5 font-semibold">
-                        <CheckCircle2 className="h-3 w-3" />
-                        <span>DONATED ₹{amountINR.toLocaleString("en-IN")}</span>
-                      </div>
-                    </div>
-
-                    <div className="rounded-xl bg-zinc-900/80 p-4 border border-white/5">
-                      <div className="text-[10px] uppercase font-mono text-zinc-400">RazorpayX Receipt</div>
-                      <div className="text-xs font-mono text-zinc-300 mt-1 truncate">
-                        {donation?.razorpayx_payout_id || "pout_test_impact_settled"}
-                      </div>
-                      {commitment.charity?.website_url && (
-                        <a
-                          href={commitment.charity.website_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-[11px] text-blue-400 hover:underline flex items-center gap-1 mt-0.5"
-                        >
-                          <span>Visit Charity</span>
-                          <ExternalLink className="h-3 w-3" />
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {commitment.status === "ACTIVE" && (
-                <div className="glass-panel glow-emerald flex items-center justify-between rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-5">
-                  <div className="flex items-center gap-3.5">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500 text-zinc-950 font-bold">
-                      <ShieldCheck className="h-6 w-6" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold text-white flex items-center gap-2">
-                        <span>Escrow Locked & Commitment Active</span>
-                        <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                      </div>
-                      <p className="text-xs text-emerald-200/80 mt-0.5">
-                        Your ₹{amountINR.toLocaleString("en-IN")} stake is secured in smart escrow. Evidence polling and progress evaluation active.
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={handleCheckResolution}
-                    disabled={isResolving}
-                    className="flex items-center gap-2 rounded-xl bg-emerald-500/20 px-3.5 py-2 text-xs font-mono font-bold text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 transition disabled:opacity-50"
-                  >
-                    {isResolving ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Award className="h-3.5 w-3.5 text-emerald-400" />
-                    )}
-                    <span>{isResolving ? "Checking..." : "Check Resolution Now"}</span>
-                  </button>
-                </div>
-              )}
-
-              {verificationData && verificationData.anomaly_flag && (
-                <div className="glass-panel rounded-2xl border border-amber-500/40 bg-amber-500/10 p-5 flex items-start gap-4">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                    <AlertTriangle className="h-6 w-6" />
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-sm font-bold text-amber-300">
-                      <span>Potential Anomaly Detected in Evidence Stream</span>
-                      <span className="rounded-md bg-amber-500/20 px-2 py-0.5 text-[10px] font-mono uppercase text-amber-300 border border-amber-500/30">
-                        FLAGGED
-                      </span>
-                    </div>
-                    <p className="text-xs text-amber-200/90 leading-relaxed">
-                      {verificationData.anomaly_reason ||
-                        "Unusual timing pattern or cluster burst detected during automated evidence inspection."}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span
-                      className={`inline-block rounded-md border px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider font-mono ${getStatusBadge(
-                        commitment.status
-                      )}`}
-                    >
-                      {commitment.status}
-                    </span>
-                    {commitment.quality_score && (
-                      <span className="flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-bold text-emerald-400">
-                        <Sparkles className="h-3 w-3" />
-                        <span>Quality: {commitment.quality_score}/100</span>
-                      </span>
-                    )}
-                  </div>
-                  <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-                    {commitment.title}
-                  </h1>
-                </div>
-
-                <div className="flex items-center gap-2 rounded-xl bg-zinc-900/80 border border-white/10 px-4 py-2 self-start sm:self-auto">
-                  <Coins className="h-5 w-5 text-amber-400" />
-                  <div>
-                    <div className="text-[10px] uppercase font-bold text-zinc-400">Pledge Stake</div>
-                    <div className="text-base font-extrabold text-white font-mono">
-                      ₹{amountINR.toLocaleString("en-IN")}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {commitment.status === "ACTIVE" && progressData && (
-                <div className="glass-panel glow-emerald rounded-2xl border border-emerald-500/20 p-6 space-y-5">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-base font-bold text-white flex items-center gap-2">
-                          <Target className="h-4 w-4 text-emerald-400" />
-                          <span>Progress & AI Verification Engine</span>
-                        </h3>
-                        {(() => {
-                          const badge = getPaceStatusBadge(progressData.status);
-                          return (
-                            <span
-                              className={`flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold font-mono uppercase ${badge.bg}`}
-                            >
-                              {badge.icon}
-                              <span>{badge.label}</span>
-                            </span>
-                          );
-                        })()}
-                        {verificationData?.ai_summary?.evidence_quality && (
-                          <span className="flex items-center gap-1 rounded-md border border-teal-500/30 bg-teal-500/10 px-2 py-0.5 text-[10px] font-mono font-bold text-teal-300">
-                            <Bot className="h-3 w-3" />
-                            <span>{verificationData.ai_summary.evidence_quality} QUALITY</span>
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-zinc-400 mt-0.5">
-                        Mathematical evaluation: {progressData.verified} / {progressData.target} {commitment.unit} verified.
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={handleVerifyAI}
-                        disabled={isVerifyingAI}
-                        className="flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/20 transition disabled:opacity-50"
-                      >
-                        {isVerifyingAI ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <BrainCircuit className="h-3.5 w-3.5 text-emerald-400" />
-                        )}
-                        <span>{isVerifyingAI ? "Analyzing AI..." : "Run AI Verification"}</span>
-                      </button>
-
-                      <div className="text-right">
-                        <div className="text-[10px] uppercase text-zinc-500 font-mono">Completion</div>
-                        <div className="text-2xl font-black text-emerald-400 font-mono">
-                          {progressData.progress_pct}%
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="h-3 w-full rounded-full bg-zinc-900 overflow-hidden border border-white/5 p-0.5">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-700 shadow-lg shadow-emerald-500/30"
-                        style={{ width: `${progressData.progress_pct}%` }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-xs text-zinc-400">
-                      <span>0 {commitment.unit}</span>
-                      <span className="font-mono text-zinc-300 font-semibold">
-                        {progressData.verified} of {progressData.target} {commitment.unit}
-                      </span>
-                      <span>{progressData.target} {commitment.unit}</span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-                    <div className="rounded-xl bg-zinc-900/60 p-3 border border-white/5">
-                      <div className="text-[10px] uppercase text-zinc-400 font-mono">Verified Items</div>
-                      <div className="text-base font-bold text-emerald-400 font-mono mt-0.5">
-                        {progressData.verified}
-                      </div>
-                    </div>
-
-                    <div className="rounded-xl bg-zinc-900/60 p-3 border border-white/5">
-                      <div className="text-[10px] uppercase text-zinc-400 font-mono">Days Remaining</div>
-                      <div className="text-base font-bold text-white font-mono mt-0.5 flex items-center gap-1">
-                        <Clock className="h-3.5 w-3.5 text-blue-400" />
-                        <span>{progressData.days_remaining}d</span>
-                      </div>
-                    </div>
-
-                    <div className="rounded-xl bg-zinc-900/60 p-3 border border-white/5">
-                      <div className="text-[10px] uppercase text-zinc-400 font-mono">Actual Daily Pace</div>
-                      <div className="text-base font-bold text-white font-mono mt-0.5">
-                        {progressData.daily_pace_actual} <span className="text-xs font-normal text-zinc-500">/day</span>
-                      </div>
-                    </div>
-
-                    <div className="rounded-xl bg-zinc-900/60 p-3 border border-white/5">
-                      <div className="text-[10px] uppercase text-zinc-400 font-mono">
-                        {verificationData?.ai_confidence
-                          ? `AI Confidence (${verificationData.ai_confidence}%)`
-                          : "Required Pace"}
-                      </div>
-                      <div className="text-base font-bold text-zinc-300 font-mono mt-0.5">
-                        {verificationData?.ai_confidence
-                          ? `${verificationData.ai_confidence}%`
-                          : `${progressData.daily_pace_required}/day`}
-                      </div>
-                    </div>
-                  </div>
-
-                  {verificationData?.ai_summary?.summary && (
-                    <div className="rounded-xl bg-zinc-900/80 p-3.5 border border-white/5 text-xs text-zinc-300 flex items-start gap-2.5">
-                      <Bot className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
-                      <div>
-                        <span className="font-semibold text-white">AI Evidence Assessment: </span>
-                        <span>{verificationData.ai_summary.summary}</span>
-                      </div>
-                    </div>
+                <div className="flex items-center gap-2 mb-1">
+                  <Badge variant={commitment.status === "ACTIVE" ? "active" : "default"} size="sm">
+                    {commitment.status}
+                  </Badge>
+                  {commitment.quality_score && (
+                    <Badge variant="active" size="sm">
+                      Quality: {commitment.quality_score}/100
+                    </Badge>
                   )}
                 </div>
-              )}
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#18181B]">
+                  {commitment.title}
+                </h1>
+              </div>
 
-              {commitment.status === "ACTIVE" && (
-                <div className="glass-panel rounded-2xl border border-white/10 p-6 space-y-4">
-                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400">
-                        <MessageSquare className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                          <span>AI Commitment Coach (AI #4)</span>
-                          <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                        </h3>
-                        <p className="text-[11px] text-zinc-400">
-                          Grounded conversational assistance trained on your real mathematical pace.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-                    {coachMessages.map((msg) => (
-                      <div
-                        key={msg.id}
-                        className={`flex gap-2.5 ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
-                      >
-                        {msg.sender === "coach" && (
-                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400 mt-1">
-                            <Bot className="h-3.5 w-3.5" />
-                          </div>
-                        )}
-                        <div
-                          className={`max-w-md rounded-2xl p-3.5 text-xs leading-relaxed ${
-                            msg.sender === "user"
-                              ? "bg-emerald-500 text-zinc-950 font-semibold"
-                              : "bg-zinc-900 border border-white/5 text-zinc-200"
-                          }`}
-                        >
-                          <div className="whitespace-pre-line">{msg.text}</div>
-                          <div
-                            className={`text-[9px] mt-1 text-right font-mono ${
-                              msg.sender === "user" ? "text-zinc-800" : "text-zinc-500"
-                            }`}
-                          >
-                            {msg.timestamp}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                    {isAskingCoach && (
-                      <div className="flex items-center gap-2 text-xs text-zinc-400 p-2">
-                        <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400" />
-                        <span>AI Coach analyzing your mathematical pace...</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {[
-                      "How is my daily pace?",
-                      "Can I still make the deadline?",
-                      "Give me a 3-day recovery plan",
-                      "What happens if I miss the goal?",
-                    ].map((promptText) => (
-                      <button
-                        key={promptText}
-                        onClick={() => handleAskCoach(promptText)}
-                        disabled={isAskingCoach}
-                        className="rounded-lg border border-white/5 bg-zinc-900/60 px-2.5 py-1 text-[11px] text-zinc-400 hover:text-white hover:bg-zinc-800 transition disabled:opacity-40"
-                      >
-                        {promptText}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="flex items-center gap-2 pt-1">
-                    <input
-                      type="text"
-                      value={coachInput}
-                      onChange={(e) => setCoachInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          handleAskCoach();
-                        }
-                      }}
-                      placeholder="Ask your coach anything about your progress or pace..."
-                      className="w-full rounded-xl border border-white/10 bg-zinc-900 p-3 text-xs text-white placeholder-zinc-500 outline-none focus:border-emerald-500"
-                    />
-                    <button
-                      onClick={() => handleAskCoach()}
-                      disabled={isAskingCoach || !coachInput.trim()}
-                      className="flex shrink-0 items-center justify-center rounded-xl bg-emerald-500 p-3 text-zinc-950 font-bold hover:bg-emerald-400 transition disabled:opacity-40"
-                    >
-                      <Send className="h-4 w-4" />
-                    </button>
-                  </div>
+              <div className="text-right shrink-0">
+                <div className="text-xs text-[#71717A]">Escrow Stake</div>
+                <div className="text-xl font-bold font-numeric text-[#18181B]">
+                  ₹{amountINR.toLocaleString("en-IN")}
                 </div>
-              )}
+              </div>
+            </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="rounded-xl bg-zinc-900/50 p-3.5 border border-white/5">
-                  <div className="text-xs text-zinc-400">Target</div>
-                  <div className="text-base font-bold text-white font-mono mt-1">
-                    {commitment.target_count}{" "}
-                    <span className="text-xs font-normal text-zinc-400">{commitment.unit}</span>
-                  </div>
-                </div>
+            {/* Two-Column Split Layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left Column: Progress & Evidence */}
+              <div className="lg:col-span-2 space-y-6">
+                {commitment.status === "ACTIVE" && progressData && (
+                  <ProgressVerificationPanel
+                    commitment={commitment}
+                    progressData={progressData}
+                    verificationData={verificationData}
+                    isVerifyingAI={isVerifyingAI}
+                    onVerifyAI={handleVerifyAI}
+                  />
+                )}
 
-                <div className="rounded-xl bg-zinc-900/50 p-3.5 border border-white/5">
-                  <div className="text-xs text-zinc-400">Duration</div>
-                  <div className="text-base font-bold text-white font-mono mt-1 flex items-center gap-1.5">
-                    <Clock className="h-4 w-4 text-emerald-400" />
-                    <span>{commitment.duration_days} Days</span>
-                  </div>
-                </div>
+                {commitment.status === "ACTIVE" && (
+                  <EvidenceFeed
+                    commitment={commitment}
+                    evidenceData={evidenceData}
+                    userRepos={userRepos}
+                    activeRepo={activeRepo}
+                    isLinkingRepo={isLinkingRepo}
+                    isSyncing={isSyncing}
+                    onRepoChange={setSelectedRepo}
+                    onLinkRepo={handleLinkRepo}
+                    onSyncNow={handleSyncNow}
+                  />
+                )}
 
-                <div className="rounded-xl bg-zinc-900/50 p-3.5 border border-white/5">
-                  <div className="text-xs text-zinc-400">Timeframe</div>
-                  <div className="text-xs font-medium text-zinc-300 mt-1.5 flex items-center gap-1">
-                    <Calendar className="h-3.5 w-3.5 text-blue-400" />
-                    <span>{startDateStr}</span>
-                  </div>
-                  <div className="text-[10px] text-zinc-500 font-mono mt-0.5">
-                    until {endDateStr}
-                  </div>
-                </div>
+                {commitment.status !== "ACTIVE" && commitment.status !== "COMPLETED" && commitment.status !== "FAILED" && (
+                  <EscrowPaymentCard
+                    commitment={commitment}
+                    paymentStep={paymentStep}
+                    onPledgePayment={handlePledgePayment}
+                  />
+                )}
+              </div>
 
-                <div className="rounded-xl bg-zinc-900/50 p-3.5 border border-white/5">
-                  <div className="text-xs text-zinc-400">Verification Source</div>
-                  <div className="text-xs font-semibold text-zinc-200 mt-1.5 flex items-center gap-1.5">
-                    <GitPullRequest className="h-3.5 w-3.5 text-blue-400" />
-                    <span className="capitalize">{commitment.evidence_type.replace("_", " ")}</span>
+              {/* Right Column: AI Coach Chat & Cause */}
+              <div className="space-y-6">
+                {commitment.status === "ACTIVE" && (
+                  <CoachChatPanel
+                    messages={coachMessages}
+                    isAskingCoach={isAskingCoach}
+                    onSendMessage={handleAskCoach}
+                  />
+                )}
+
+                {commitment.charity && (
+                  <CharityCard charity={commitment.charity} />
+                )}
+
+                {/* Target Parameters */}
+                <div className="p-4 rounded-[8px] bg-white border border-[#E4E7EB] space-y-2 text-xs">
+                  <div className="font-semibold text-[#18181B] pb-1 border-b border-[#E4E7EB]">
+                    Target Specifications
+                  </div>
+                  <div className="flex justify-between text-[#52525B]">
+                    <span>Target Metric</span>
+                    <span className="font-numeric font-medium text-[#18181B]">{commitment.target_count} {commitment.unit}</span>
+                  </div>
+                  <div className="flex justify-between text-[#52525B]">
+                    <span>Duration</span>
+                    <span className="font-numeric font-medium text-[#18181B]">{commitment.duration_days} days</span>
+                  </div>
+                  <div className="flex justify-between text-[#52525B]">
+                    <span>Evidence Source</span>
+                    <span className="capitalize text-[#18181B]">{commitment.evidence_type.replace("_", " ")}</span>
                   </div>
                 </div>
               </div>
-
-              {commitment.status === "ACTIVE" && (
-                <div className="glass-panel rounded-2xl border border-white/10 p-6 space-y-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
-                    <div>
-                      <h3 className="text-base font-bold text-white flex items-center gap-2">
-                        <GitBranch className="h-4 w-4 text-emerald-400" />
-                        <span>Linked Repository & Automated Evidence Poller</span>
-                      </h3>
-                      <p className="text-xs text-zinc-400 mt-0.5">
-                        Evidence is fetched concurrently across commits, PRs, and issues.
-                      </p>
-                    </div>
-
-                    <button
-                      onClick={handleSyncNow}
-                      disabled={isSyncing}
-                      className="glow-emerald flex items-center gap-2 rounded-xl bg-zinc-900 border border-emerald-500/30 px-4 py-2 text-xs font-bold text-emerald-300 hover:bg-emerald-500/10 transition disabled:opacity-50"
-                    >
-                      <RefreshCw
-                        className={`h-3.5 w-3.5 text-emerald-400 ${
-                          isSyncing ? "animate-spin" : ""
-                        }`}
-                      />
-                      <span>{isSyncing ? "Syncing Evidence..." : "Sync Now"}</span>
-                    </button>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row items-center gap-3">
-                    <div className="w-full">
-                      <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
-                        Assigned GitHub Repository
-                      </label>
-                      {userRepos && userRepos.length > 0 ? (
-                        <select
-                          value={activeRepo}
-                          onChange={(e) => setSelectedRepo(e.target.value)}
-                          className="w-full rounded-xl border border-white/10 bg-zinc-900 p-3 text-xs font-mono text-white outline-none focus:border-emerald-500"
-                        >
-                          {userRepos.map((repo) => (
-                            <option key={repo.id} value={repo.full_name}>
-                              {repo.full_name}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <input
-                          type="text"
-                          value={activeRepo}
-                          onChange={(e) => setSelectedRepo(e.target.value)}
-                          placeholder="e.g. username/repository-name"
-                          className="w-full rounded-xl border border-white/10 bg-zinc-900 p-3 text-xs font-mono text-white placeholder-zinc-600 outline-none focus:border-emerald-500"
-                        />
-                      )}
-                    </div>
-
-                    <button
-                      onClick={handleLinkRepo}
-                      disabled={isLinkingRepo || activeRepo === commitment.github_repo}
-                      className="mt-6 flex shrink-0 items-center gap-1.5 rounded-xl bg-zinc-800 border border-white/10 px-4 py-3 text-xs font-semibold text-white hover:bg-zinc-700 transition disabled:opacity-40"
-                    >
-                      {isLinkingRepo ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Check className="h-3.5 w-3.5 text-emerald-400" />
-                      )}
-                      <span>{activeRepo === commitment.github_repo ? "Linked" : "Link Repo"}</span>
-                    </button>
-                  </div>
-
-                  <div className="space-y-3 pt-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold uppercase tracking-wider text-zinc-400 font-mono">
-                        Raw Evidence Stream ({evidenceData?.length || 0})
-                      </span>
-                      <span className="text-[10px] text-emerald-400 font-mono">
-                        Deduplicated by source_ref
-                      </span>
-                    </div>
-
-                    {evidenceData && evidenceData.length > 0 ? (
-                      <div className="divide-y divide-white/5 rounded-xl border border-white/5 bg-zinc-900/40">
-                        {evidenceData.map((ev) => (
-                          <div
-                            key={ev.id}
-                            className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3.5 hover:bg-white/[0.02] transition"
-                          >
-                            <div className="flex items-start gap-2.5">
-                              {ev.source === "github_commit" ? (
-                                <GitCommit className="h-4 w-4 text-emerald-400 mt-0.5 shrink-0" />
-                              ) : (
-                                <GitPullRequest className="h-4 w-4 text-blue-400 mt-0.5 shrink-0" />
-                              )}
-                              <div>
-                                <div className="text-xs font-semibold text-white">
-                                  {ev.raw_payload.message || ev.raw_payload.title || ev.source_ref}
-                                </div>
-                                <div className="flex items-center gap-2 text-[10px] text-zinc-400 mt-0.5">
-                                  <span className="font-mono text-zinc-300">
-                                    {ev.source_ref}
-                                  </span>
-                                  <span>•</span>
-                                  <span>{new Date(ev.occurred_at).toLocaleString()}</span>
-                                  {ev.raw_payload.author && (
-                                    <>
-                                      <span>•</span>
-                                      <span className="text-emerald-400">
-                                        @{ev.raw_payload.author}
-                                      </span>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-
-                            {ev.raw_payload.url && (
-                              <a
-                                href={ev.raw_payload.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="self-end sm:self-center flex items-center gap-1 text-[10px] text-zinc-400 hover:text-white transition"
-                              >
-                                <span>Inspect</span>
-                                <ExternalLink className="h-3 w-3" />
-                              </a>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="rounded-xl border border-dashed border-white/10 p-8 text-center">
-                        <GitCommit className="mx-auto h-8 w-8 text-zinc-600 mb-2" />
-                        <div className="text-xs font-semibold text-zinc-300">
-                          No evidence items recorded yet
-                        </div>
-                        <p className="text-[11px] text-zinc-500 mt-1 max-w-sm mx-auto">
-                          Click &quot;Sync Now&quot; above or push code to your linked GitHub repository.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {commitment.charity && (
-                <div className="glass-panel rounded-2xl border border-white/10 p-6 space-y-4">
-                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                      <Heart className="h-4 w-4 text-rose-400" />
-                      <span>Fallback Impact Beneficiary</span>
-                    </h3>
-                    <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-400 border border-emerald-500/20">
-                      {commitment.charity.category}
-                    </span>
-                  </div>
-
-                  <div className="flex items-start gap-4">
-                    {commitment.charity.logo_url && (
-                      <div className="relative h-16 w-16 shrink-0 rounded-xl overflow-hidden bg-zinc-800 border border-white/10">
-                        <Image
-                          src={commitment.charity.logo_url}
-                          alt={commitment.charity.name}
-                          fill
-                          className="object-cover"
-                        />
-                      </div>
-                    )}
-                    <div>
-                      <h4 className="text-base font-bold text-white">
-                        {commitment.charity.name}
-                      </h4>
-                      <p className="mt-1 text-xs text-zinc-400 leading-relaxed">
-                        {commitment.charity.description}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {commitment.status !== "ACTIVE" && commitment.status !== "COMPLETED" && commitment.status !== "FAILED" && (
-                <div className="glass-panel glow-emerald rounded-2xl border border-white/10 p-6 space-y-5">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="text-base font-bold text-white flex items-center gap-2">
-                        <Lock className="h-4 w-4 text-emerald-400" />
-                        <span>Authorize Escrow & Lock Pledge</span>
-                      </h3>
-                      <p className="text-xs text-zinc-400 mt-1">
-                        Deposit your stake into the PledgePay verified escrow via Razorpay Test Mode. 100% refunded when you achieve your goal.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="flex items-center gap-3 rounded-xl bg-zinc-900/60 p-3 border border-white/5 text-xs text-zinc-300">
-                      <Zap className="h-4 w-4 text-emerald-400 shrink-0" />
-                      <span>Instant automated refund upon milestone completion</span>
-                    </div>
-                    <div className="flex items-center gap-3 rounded-xl bg-zinc-900/60 p-3 border border-white/5 text-xs text-zinc-300">
-                      <Flame className="h-4 w-4 text-rose-400 shrink-0" />
-                      <span>Zero fee routing to chosen charity on failure</span>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={handlePledgePayment}
-                    disabled={paymentStep !== "idle" && paymentStep !== "error"}
-                    className="glow-emerald flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 py-3.5 font-bold text-zinc-950 transition hover:bg-emerald-400 disabled:opacity-50"
-                  >
-                    {paymentStep === "creating_order" ? (
-                      <>
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                        <span>Initializing Razorpay Order...</span>
-                      </>
-                    ) : paymentStep === "processing_payment" ? (
-                      <>
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                        <span>Processing Payment in Razorpay...</span>
-                      </>
-                    ) : paymentStep === "verifying" ? (
-                      <>
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                        <span>Verifying HMAC Signature Server-Side...</span>
-                      </>
-                    ) : paymentStep === "success" ? (
-                      <>
-                        <CheckCircle2 className="h-5 w-5 text-zinc-950" />
-                        <span>Payment Verified! Commitment Active</span>
-                      </>
-                    ) : (
-                      <>
-                        <CreditCard className="h-4 w-4" />
-                        <span>Pledge & Authorize ₹{amountINR.toLocaleString("en-IN")} Escrow</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              )}
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
         <DemoControls commitmentId={commitmentId} />
       </div>
     </AuthGuard>
