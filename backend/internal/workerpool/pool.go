@@ -31,7 +31,6 @@ func RunPool[T any](ctx context.Context, size int, jobs <-chan T, fn func(T) err
 						select {
 						case errChan <- fmt.Errorf("worker %d failed: %w", workerID, err):
 						default:
-							// doicnt block it
 						}
 					}
 				}

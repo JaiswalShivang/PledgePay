@@ -1,0 +1,9 @@
+DROP TABLE IF EXISTS webhook_events;
+DROP TABLE IF EXISTS verification_results;
+DROP TABLE IF EXISTS evidence;
+DROP TABLE IF EXISTS integrations;
+DROP TABLE IF EXISTS refunds;
+DROP TABLE IF EXISTS payments;
+DROP TABLE IF EXISTS commitment_rules;
+DROP TABLE IF EXISTS commitments;
+DROP TABLE IF EXISTS users;
