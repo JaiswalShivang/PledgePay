@@ -3,11 +3,8 @@
 import { Button } from "@/components/ui";
 import {
   GitBranch,
-  GitCommit,
-  GitPullRequest,
   RefreshCw,
   ExternalLink,
-  Check,
   Trophy,
   CheckCircle2,
 } from "lucide-react";
@@ -27,7 +24,7 @@ interface EvidenceFeedProps {
 
 export function EvidenceFeed({
   commitment,
-  evidenceData = [],
+  evidenceData,
   userRepos = [],
   activeRepo,
   isLinkingRepo,
@@ -39,46 +36,44 @@ export function EvidenceFeed({
   const isCodeforces = commitment.evidence_type === "codeforces_submissions";
 
   return (
-    <div className="p-5 rounded-[8px] bg-white border border-[#E4E7EB] space-y-4">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#E4E7EB]">
-        <div>
-          <h2 className="text-sm font-semibold text-[#18181B] flex items-center gap-1.5">
+    <div className="p-8 rounded-[12px] bg-white border border-[#F2F3F7] space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#F2F3F7]">
+        <div className="space-y-1">
+          <h2 className="text-subhead text-[#16161A] flex items-center gap-2">
             {isCodeforces ? (
-              <Trophy className="h-4 w-4 text-[#EA580C]" />
+              <Trophy className="h-5 w-5 text-[#FF6B35]" />
             ) : (
-              <GitBranch className="h-4 w-4 text-[#52525B]" />
+              <GitBranch className="h-5 w-5 text-[#3D5AFE]" />
             )}
             <span>
               {isCodeforces
                 ? "Codeforces Verification & Solved Problems"
-                : "GitHub Repository & Evidence"}
+                : "GitHub Repository & Evidence Feed"}
             </span>
           </h2>
-          <p className="text-xs text-[#52525B]">
+          <p className="text-[14px] text-[#16161A]/70 font-body">
             {isCodeforces
-              ? "Automated polling of accepted problem submissions from Codeforces."
-              : "Automated polling of commits, PRs, and closed issues."}
+              ? "Automated continuous polling of accepted problem submissions from Codeforces."
+              : "Automated daily polling of commits, PRs, and closed milestones."}
           </p>
         </div>
 
         <Button
           onClick={onSyncNow}
-          variant="secondary"
+          variant="outline"
           size="sm"
           isLoading={isSyncing}
-          leftIcon={<RefreshCw className="h-3.5 w-3.5 text-[#52525B]" />}
+          leftIcon={<RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />}
         >
           {isSyncing ? "Syncing..." : "Sync Now"}
         </Button>
       </div>
 
-      {/* Account / Repo Status Selector */}
       {isCodeforces ? (
-        <div className="flex items-center justify-between p-3 rounded-[6px] bg-[#FFF7ED] border border-[#FFEDD5] text-xs">
-          <div className="flex items-center gap-2">
-            <Trophy className="h-4 w-4 text-[#EA580C]" />
-            <span className="text-[#9A3412] font-medium">
+        <div className="flex items-center justify-between p-4 rounded-[12px] bg-[#F2F3F7] text-[14px] font-body text-[#16161A]">
+          <div className="flex items-center gap-2.5">
+            <Trophy className="h-4 w-4 text-[#FF6B35]" />
+            <span className="font-medium">
               Verified Codeforces Polling Active
             </span>
           </div>
@@ -86,144 +81,101 @@ export function EvidenceFeed({
             href="https://codeforces.com"
             target="_blank"
             rel="noreferrer"
-            className="flex items-center gap-1 text-[#C2410C] hover:underline font-medium"
+            className="flex items-center gap-1.5 text-[#3D5AFE] hover:underline font-medium"
           >
             <span>Open Codeforces</span>
-            <ExternalLink className="h-3 w-3" />
+            <ExternalLink className="h-3.5 w-3.5" />
           </a>
         </div>
       ) : (
-        <div className="flex flex-col sm:flex-row items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-center gap-3">
           <div className="w-full">
             {userRepos.length > 0 ? (
               <select
                 value={activeRepo}
                 onChange={(e) => onRepoChange(e.target.value)}
-                className="w-full rounded-[6px] border border-[#D1D5DB] bg-white px-3 py-1.5 text-xs font-numeric text-[#18181B] outline-none focus:border-[#047857]"
+                className="w-full rounded-[12px] border border-[#D8DBE0] bg-white px-4 py-2.5 text-[14px] font-body text-[#16161A] focus:outline-none focus:border-[#3D5AFE]"
               >
+                <option value="" disabled>Select a repository...</option>
                 {userRepos.map((repo) => (
                   <option key={repo.id} value={repo.full_name}>
-                    {repo.full_name}
+                    {repo.full_name} {repo.private ? "(Private)" : ""}
                   </option>
                 ))}
               </select>
             ) : (
               <input
                 type="text"
+                placeholder="e.g. username/repository"
                 value={activeRepo}
                 onChange={(e) => onRepoChange(e.target.value)}
-                placeholder="e.g. username/repository-name"
-                className="w-full rounded-[6px] border border-[#D1D5DB] bg-white px-3 py-1.5 text-xs font-numeric text-[#18181B] placeholder-[#9CA3AF] outline-none focus:border-[#047857]"
+                className="w-full rounded-[12px] border border-[#D8DBE0] bg-white px-4 py-2.5 text-[14px] font-body text-[#16161A] focus:outline-none focus:border-[#3D5AFE]"
               />
             )}
           </div>
-
           <Button
             onClick={onLinkRepo}
-            variant={activeRepo === commitment.github_repo ? "outline" : "primary"}
-            size="sm"
+            variant="primary"
+            size="md"
             isLoading={isLinkingRepo}
-            disabled={activeRepo === commitment.github_repo || !activeRepo}
-            className="shrink-0 w-full sm:w-auto"
-            leftIcon={<Check className="h-3.5 w-3.5" />}
+            disabled={!activeRepo}
+            className="w-full sm:w-auto shrink-0"
           >
-            {activeRepo === commitment.github_repo ? "Linked" : "Link Repo"}
+            Link Repository
           </Button>
         </div>
       )}
 
-      {/* Evidence Stream */}
-      <div className="space-y-2 pt-1">
-        <div className="flex items-center justify-between text-xs text-[#71717A]">
-          <span className="font-medium text-[#18181B]">
-            Evidence Stream ({evidenceData.length})
-          </span>
-          <span className="font-numeric text-[11px]">Dedup · Window-filtered</span>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-[14px] font-medium text-[#16161A]/70 font-body">
+            Polled Evidence {evidenceData ? `(${evidenceData.length})` : ""}
+          </h3>
+          {isSyncing && (
+            <span className="inline-flex items-center gap-1.5 text-[14px] text-[#3D5AFE] font-body">
+              <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Polling…
+            </span>
+          )}
         </div>
 
-        {evidenceData.length > 0 ? (
-          <div className="divide-y divide-[#E4E7EB] rounded-[6px] border border-[#E4E7EB] bg-[#F8F9FA]">
-            {evidenceData.map((ev) => {
-              const isCf = ev.source === "codeforces_submission";
-              const occurredAt = new Date(ev.occurred_at);
-              const startDate = commitment.start_date ? new Date(commitment.start_date) : null;
-              const endDate = commitment.end_date ? new Date(commitment.end_date) : null;
-              const inWindow = (
-                (!startDate || occurredAt >= startDate) &&
-                (!endDate || occurredAt <= endDate)
-              );
-              return (
-                <div
-                  key={ev.id}
-                  className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 hover:bg-white transition-colors ${!inWindow ? "opacity-50" : ""}`}
-                >
-                  <div className="flex items-start gap-2">
-                    {isCf ? (
-                      <CheckCircle2 className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${inWindow ? "text-[#047857]" : "text-[#9CA3AF]"}`} />
-                    ) : ev.source === "github_commit" ? (
-                      <GitCommit className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${inWindow ? "text-[#047857]" : "text-[#9CA3AF]"}`} />
-                    ) : (
-                      <GitPullRequest className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${inWindow ? "text-[#1D4ED8]" : "text-[#9CA3AF]"}`} />
-                    )}
-                    <div>
-                      <div className="text-xs font-medium text-[#18181B]">
-                        {ev.raw_payload.title ||
-                          ev.raw_payload.name ||
-                          ev.raw_payload.message ||
-                          ev.source_ref}
-                      </div>
-                      <div className="flex items-center gap-2 text-[11px] text-[#71717A] mt-0.5 font-numeric">
-                        {!inWindow && (
-                          <span className="text-[#EA580C] font-medium">⚠ outside window</span>
-                        )}
-                        {inWindow && (
-                          <span className="text-[#047857] font-medium">✓ counted</span>
-                        )}
-                        <span>•</span>
-                        <span>{occurredAt.toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
-                        {ev.raw_payload.author && (
-                          <>
-                            <span>•</span>
-                            <span>@{ev.raw_payload.author}</span>
-                          </>
-                        )}
-                        {ev.raw_payload.handle && (
-                          <>
-                            <span>•</span>
-                            <span>@{ev.raw_payload.handle}</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {ev.raw_payload.url && (
-                    <a
-                      href={ev.raw_payload.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="self-end sm:self-center flex items-center gap-1 text-[11px] text-[#52525B] hover:text-[#18181B] transition-colors"
-                    >
-                      <span>Inspect</span>
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  )}
-                </div>
-              );
-            })}
+        {evidenceData === undefined ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((n) => (
+              <div key={n} className="h-16 rounded-[12px] bg-[#F2F3F7] animate-pulse" />
+            ))}
+          </div>
+        ) : evidenceData.length === 0 ? (
+          <div className="p-8 text-center rounded-[12px] bg-[#F2F3F7] text-[14px] text-[#16161A]/60 font-body">
+            No evidence events synced yet. Sync manually or push commits to trigger polling.
           </div>
         ) : (
-          <div className="rounded-[6px] border border-dashed border-[#E4E7EB] p-5 text-center text-xs text-[#71717A] space-y-1">
-            <div className="font-medium text-[#18181B]">No evidence polled yet</div>
-            <p className="text-[11px] text-[#71717A]">
-              {isCodeforces
-                ? 'Submit your solved problems on Codeforces and click "Sync Now".'
-                : 'Push code to your repository or click "Sync Now".'}
-            </p>
+          <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
+            {evidenceData.map((ev) => (
+              <div
+                key={ev.id}
+                className="flex items-center justify-between p-4 rounded-[12px] bg-white border border-[#F2F3F7] hover:border-[#3D5AFE] transition-colors"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="h-8 w-8 rounded-[12px] bg-[#00C896] text-white flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[14px] font-medium text-[#16161A] truncate font-body">
+                      {ev.raw_payload?.title || ev.raw_payload?.message || ev.raw_payload?.problem_name || "Verified Submission"}
+                    </p>
+                    <p className="text-[14px] text-[#16161A]/50 font-body">
+                      {new Date(ev.occurred_at || ev.ingested_at).toLocaleString("en-IN")}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[14px] px-2.5 py-1 rounded-[12px] font-medium bg-[#00C896] text-white shrink-0 font-body">
+                  +1 {commitment.unit}
+                </span>
+              </div>
+            ))}
           </div>
         )}
       </div>
     </div>
   );
 }
-

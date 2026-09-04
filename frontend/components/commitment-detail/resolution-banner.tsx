@@ -16,52 +16,33 @@ export function ResolutionBanner({ commitment, statusData }: ResolutionBannerPro
   const amountINR = commitment.amount_paise / 100;
   const bannerRef = useRef<HTMLDivElement>(null);
 
-  // One-shot settle-pulse animation on mount — the emotional payoff moment
   useEffect(() => {
     const el = bannerRef.current;
     if (!el) return;
-    const cls = isSuccess ? "animate-settle-success" : "animate-settle-impact";
-    el.classList.add(cls);
-    const timer = setTimeout(() => el.classList.remove(cls), 800);
-    return () => clearTimeout(timer);
-  }, [isSuccess]);
+    el.classList.add("animate-settle-pulse");
+  }, []);
 
   if (isSuccess) {
     return (
       <div
         ref={bannerRef}
-        className="w-full rounded-[14px] overflow-hidden"
-        style={{
-          background: "linear-gradient(135deg, #0A6640 0%, #065535 50%, #0A6640 100%)",
-          boxShadow: "0 4px 24px rgba(10,102,64,0.3)",
-        }}
+        className="w-full rounded-[12px] bg-[#00C896] text-white overflow-hidden border border-[#00C896]"
       >
-        {/* Top bar */}
-        <div className="flex items-center gap-3 px-6 py-5">
-          <div
-            className="h-10 w-10 rounded-full flex items-center justify-center shrink-0"
-            style={{ backgroundColor: "rgba(255,255,255,0.15)" }}
-          >
-            <Trophy className="h-5 w-5 text-white" />
+        <div className="flex items-center gap-4 px-6 py-6">
+          <div className="h-12 w-12 rounded-[12px] bg-white/20 flex items-center justify-center shrink-0">
+            <Trophy className="h-6 w-6 text-white" />
           </div>
-          <div>
-            <h2
-              className="text-base font-bold text-white"
-              style={{ fontFamily: "var(--font-display, 'Space Grotesk', sans-serif)" }}
-            >
+          <div className="space-y-1">
+            <h2 className="text-subhead text-white">
               Commitment Complete — Stake Refunded
             </h2>
-            <p className="text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.65)" }}>
-              You achieved your goal of {commitment.target_count} {commitment.unit}. Well done.
+            <p className="text-[14px] text-white/90 font-body">
+              You achieved your goal of {commitment.target_count} {commitment.unit}. 100% principal refunded.
             </p>
           </div>
         </div>
 
-        {/* Stat row */}
-        <div
-          className="grid grid-cols-1 sm:grid-cols-3 gap-px"
-          style={{ backgroundColor: "rgba(255,255,255,0.1)" }}
-        >
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-white/20">
           {[
             {
               label: "Verified Milestones",
@@ -74,21 +55,14 @@ export function ResolutionBanner({ commitment, statusData }: ResolutionBannerPro
             {
               label: "Refund Status",
               value: `₹${amountINR.toLocaleString("en-IN")} refunded`,
-              icon: <CheckCircle2 className="h-3.5 w-3.5 mr-1 inline" />,
+              icon: <CheckCircle2 className="h-4 w-4 mr-1 inline text-white" />,
             },
           ].map((stat) => (
-            <div
-              key={stat.label}
-              className="px-6 py-4"
-              style={{ backgroundColor: "rgba(0,0,0,0.15)" }}
-            >
-              <div className="text-[10px] font-medium uppercase tracking-wider mb-1" style={{ color: "rgba(255,255,255,0.5)" }}>
+            <div key={stat.label} className="px-6 py-4 bg-[#00C896]">
+              <div className="text-[14px] font-medium text-white/70 font-body uppercase">
                 {stat.label}
               </div>
-              <div
-                className="text-sm font-semibold text-white"
-                style={{ fontFamily: "var(--font-data)" }}
-              >
+              <div className="text-[16px] font-bold text-white font-display mt-0.5">
                 {stat.icon}{stat.value}
               </div>
             </div>
@@ -98,41 +72,27 @@ export function ResolutionBanner({ commitment, statusData }: ResolutionBannerPro
     );
   }
 
-  // Failed / donated
   return (
     <div
       ref={bannerRef}
-      className="w-full rounded-[14px] overflow-hidden"
-      style={{
-        background: "linear-gradient(135deg, #C44B0A 0%, #A33D08 50%, #C44B0A 100%)",
-        boxShadow: "0 4px 24px rgba(196,75,10,0.3)",
-      }}
+      className="w-full rounded-[12px] bg-[#FF3D71] text-white overflow-hidden border border-[#FF3D71]"
     >
-      <div className="flex items-center gap-3 px-6 py-5">
-        <div
-          className="h-10 w-10 rounded-full flex items-center justify-center shrink-0"
-          style={{ backgroundColor: "rgba(255,255,255,0.15)" }}
-        >
-          <Heart className="h-5 w-5 text-white" />
+      <div className="flex items-center gap-4 px-6 py-6">
+        <div className="h-12 w-12 rounded-[12px] bg-white/20 flex items-center justify-center shrink-0">
+          <Heart className="h-6 w-6 text-white" />
         </div>
-        <div>
-          <h2
-            className="text-base font-bold text-white"
-            style={{ fontFamily: "var(--font-display, 'Space Grotesk', sans-serif)" }}
-          >
+        <div className="space-y-1">
+          <h2 className="text-subhead text-white">
             Resolved — Charitable Impact Dispatched
           </h2>
-          <p className="text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.65)" }}>
+          <p className="text-[14px] text-white/90 font-body">
             Your ₹{amountINR.toLocaleString("en-IN")} stake has been transferred to{" "}
-            <strong className="text-white">{commitment.charity?.name}</strong>.
+            <strong>{commitment.charity?.name}</strong>.
           </p>
         </div>
       </div>
 
-      <div
-        className="grid grid-cols-1 sm:grid-cols-3 gap-px"
-        style={{ backgroundColor: "rgba(255,255,255,0.1)" }}
-      >
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-white/20">
         {[
           {
             label: "Final Progress",
@@ -147,18 +107,11 @@ export function ResolutionBanner({ commitment, statusData }: ResolutionBannerPro
             value: donation?.razorpayx_payout_id ?? "pout_impact_settled",
           },
         ].map((stat) => (
-          <div
-            key={stat.label}
-            className="px-6 py-4"
-            style={{ backgroundColor: "rgba(0,0,0,0.15)" }}
-          >
-            <div className="text-[10px] font-medium uppercase tracking-wider mb-1" style={{ color: "rgba(255,255,255,0.5)" }}>
+          <div key={stat.label} className="px-6 py-4 bg-[#FF3D71]">
+            <div className="text-[14px] font-medium text-white/70 font-body uppercase">
               {stat.label}
             </div>
-            <div
-              className="text-sm font-semibold text-white truncate"
-              style={{ fontFamily: "var(--font-data)" }}
-            >
+            <div className="text-[16px] font-bold text-white font-display mt-0.5 truncate">
               {stat.value}
             </div>
           </div>

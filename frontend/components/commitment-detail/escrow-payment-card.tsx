@@ -2,6 +2,7 @@
 
 import { Lock, CreditCard } from "lucide-react";
 import { Commitment } from "@/lib/api-client";
+import { Button } from "@/components/ui/button";
 
 interface EscrowPaymentCardProps {
   commitment: Commitment;
@@ -19,87 +20,56 @@ export function EscrowPaymentCard({ commitment, paymentStep, onPledgePayment }: 
     `Deposit ₹${amountINR.toLocaleString("en-IN")} → Escrow`;
 
   return (
-    <div
-      className="rounded-[12px] overflow-hidden"
-      style={{
-        backgroundColor: "#F0FDF4",
-        border: "1px solid #6EE7B7",
-      }}
-    >
-      {/* Header */}
-      <div
-        className="flex items-center gap-2.5 px-5 py-4"
-        style={{ borderBottom: "1px solid rgba(110,231,183,0.5)" }}
-      >
-        <div
-          className="h-7 w-7 rounded-[6px] flex items-center justify-center shrink-0"
-          style={{ backgroundColor: "rgba(10,102,64,0.12)" }}
-        >
-          <Lock className="h-4 w-4 text-[#0A6640]" />
+    <div className="rounded-[12px] bg-white border-2 border-[#FF6B35] overflow-hidden">
+      <div className="flex items-center gap-3 px-6 py-5 border-b border-[#F2F3F7]">
+        <div className="h-8 w-8 rounded-[12px] bg-[#FF6B35] text-white flex items-center justify-center shrink-0">
+          <Lock className="h-4 w-4" />
         </div>
         <div>
-          <h3
-            className="text-sm font-semibold text-[#065535]"
-            style={{ fontFamily: "var(--font-display, 'Space Grotesk', sans-serif)" }}
-          >
+          <h3 className="text-subhead text-[#16161A]">
             Authorize Escrow Deposit
           </h3>
-          <p className="text-[11px] text-[#6B7485]">
-            100% refunded on goal completion
+          <p className="text-[14px] text-[#16161A]/70 font-body">
+            100% principal refunded on goal completion
           </p>
         </div>
       </div>
 
-      {/* Amount */}
-      <div className="px-5 pt-5 pb-2">
-        <div className="flex items-baseline gap-1">
-          <span
-            className="text-3xl font-bold text-[#0A6640]"
-            style={{ fontFamily: "var(--font-data, 'JetBrains Mono', monospace)" }}
-          >
+      <div className="px-6 pt-6 pb-3">
+        <div className="flex items-baseline gap-2">
+          <span className="text-[32px] font-bold font-display text-[#FF6B35]">
             ₹{amountINR.toLocaleString("en-IN")}
           </span>
-          <span className="text-xs text-[#6B7485]">into escrow</span>
+          <span className="text-[14px] text-[#16161A]/60 font-body">into escrow vault</span>
         </div>
         {commitment.charity && (
-          <p className="text-xs text-[#4B5263] mt-1">
-            On miss → transferred to <strong className="text-[#C44B0A]">{commitment.charity.name}</strong>
+          <p className="text-[14px] text-[#16161A]/80 font-body mt-2">
+            On missed deadline → routes directly to <strong className="text-[#FF3D71]">{commitment.charity.name}</strong>
           </p>
         )}
       </div>
 
-      {/* Test guide */}
-      <div className="px-5 pb-5 space-y-4">
-        <div
-          className="rounded-[8px] p-3 space-y-1.5"
-          style={{ backgroundColor: "rgba(30,79,216,0.06)", border: "1px solid rgba(30,79,216,0.15)" }}
-        >
-          <p className="text-[11px] font-semibold text-[#1E4FD8]">Razorpay Test Mode</p>
-          <ul className="text-[11px] text-[#1E3A8A] space-y-0.5 list-disc pl-4">
-            <li><strong>NetBanking</strong>: Pick any bank → click <strong>&quot;Success&quot;</strong></li>
-            <li><strong>UPI</strong>: Enter <code className="font-data bg-[#DBEAFE] px-1 rounded">success@razorpay</code></li>
-            <li><strong>Card</strong>: <code className="font-data bg-[#DBEAFE] px-1 rounded">4012 0000 0000 0002</code></li>
+      <div className="px-6 pb-6 space-y-4">
+        <div className="rounded-[12px] p-4 bg-[#F2F3F7] space-y-2 text-[14px] font-body text-[#16161A]">
+          <p className="font-bold text-[#16161A]">Razorpay Test Sandbox</p>
+          <ul className="space-y-1 text-[14px] text-[#16161A]/80">
+            <li>&bull; <strong>NetBanking</strong>: Pick any test bank &rarr; select <strong>Success</strong></li>
+            <li>&bull; <strong>UPI</strong>: Enter <code className="bg-white px-1.5 py-0.5 rounded-[12px] border border-[#D8DBE0]">success@razorpay</code></li>
+            <li>&bull; <strong>Card</strong>: <code className="bg-white px-1.5 py-0.5 rounded-[12px] border border-[#D8DBE0]">4012 0000 0000 0002</code></li>
           </ul>
         </div>
 
-        <button
+        <Button
           onClick={onPledgePayment}
           disabled={isPending}
-          className="w-full flex items-center justify-center gap-2 h-10 text-sm font-semibold text-white rounded-[8px] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-          style={{ backgroundColor: "#0A6640", fontFamily: "var(--font-body, Inter, sans-serif)" }}
-          onMouseOver={(e) => !isPending && ((e.currentTarget as HTMLButtonElement).style.backgroundColor = "#085535")}
-          onMouseOut={(e) => ((e.currentTarget as HTMLButtonElement).style.backgroundColor = "#0A6640")}
+          variant="stake"
+          size="lg"
+          className="w-full"
+          isLoading={isPending}
+          leftIcon={<CreditCard className="h-4 w-4" />}
         >
-          {isPending ? (
-            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-          ) : (
-            <CreditCard className="h-4 w-4" />
-          )}
           {stepLabel}
-        </button>
+        </Button>
       </div>
     </div>
   );
