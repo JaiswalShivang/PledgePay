@@ -2,10 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogIn, UserPlus, LogOut, Plus, LayoutDashboard, ShieldCheck } from "lucide-react";
+import { LogIn, UserPlus, LogOut, Plus, LayoutDashboard } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 
-// ── Logo Mark ────────────────────────────────────────────────────────────────
 function VaultMark({ className }: { className?: string }) {
   return (
     <svg
@@ -15,24 +14,17 @@ function VaultMark({ className }: { className?: string }) {
       className={className}
       aria-hidden="true"
     >
-      {/* Outer vault shape */}
-      <rect x="2" y="3" width="24" height="22" rx="4" fill="#0A6640" />
-      {/* Vault door circle */}
-      <circle cx="14" cy="14" r="7" stroke="white" strokeWidth="1.5" fill="none" />
-      {/* Dial lines */}
-      <line x1="14" y1="7" x2="14" y2="9.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
-      <line x1="14" y1="18.5" x2="14" y2="21" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
-      <line x1="7" y1="14" x2="9.5" y2="14" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
-      <line x1="18.5" y1="14" x2="21" y2="14" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
-      {/* Center dot */}
-      <circle cx="14" cy="14" r="2" fill="white" />
-      {/* Handle stub */}
-      <rect x="19" y="13" width="3" height="2" rx="1" fill="white" />
+      <rect x="2" y="3" width="24" height="22" rx="6" fill="#3D5AFE" />
+      <circle cx="14" cy="14" r="7" stroke="white" strokeWidth="2" fill="none" />
+      <line x1="14" y1="7" x2="14" y2="10" stroke="white" strokeWidth="2" strokeLinecap="round" />
+      <line x1="14" y1="18" x2="14" y2="21" stroke="white" strokeWidth="2" strokeLinecap="round" />
+      <line x1="7" y1="14" x2="10" y2="14" stroke="white" strokeWidth="2" strokeLinecap="round" />
+      <line x1="18" y1="14" x2="21" y2="14" stroke="white" strokeWidth="2" strokeLinecap="round" />
+      <circle cx="14" cy="14" r="2.5" fill="white" />
     </svg>
   );
 }
 
-// ── Nav Link ─────────────────────────────────────────────────────────────────
 function NavLink({
   href,
   active,
@@ -48,28 +40,19 @@ function NavLink({
     <Link
       href={href}
       className={[
-        "relative flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-[6px] transition-colors duration-150",
-        "outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-50",
+        "relative flex items-center gap-2 px-3.5 py-2 text-[14px] font-medium rounded-[12px] transition-colors font-body",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3D5AFE]",
         active
-          ? "text-white bg-[rgba(255,255,255,0.1)]"
-          : "text-[rgba(255,255,255,0.6)] hover:text-white hover:bg-[rgba(255,255,255,0.06)]",
+          ? "text-[#3D5AFE] bg-[#3D5AFE]/10 font-semibold"
+          : "text-[#16161A]/70 hover:text-[#16161A] hover:bg-[#F2F3F7]",
       ].join(" ")}
-      style={{ fontFamily: "var(--font-body, Inter, sans-serif)" }}
     >
-      {icon && <span className="shrink-0 opacity-80">{icon}</span>}
+      {icon && <span className="shrink-0">{icon}</span>}
       {children}
-      {/* Active underline */}
-      {active && (
-        <span
-          className="absolute bottom-0 left-3 right-3 h-[2px] rounded-full bg-[#0A6640]"
-          style={{ bottom: "-1px" }}
-        />
-      )}
     </Link>
   );
 }
 
-// ── User Avatar ───────────────────────────────────────────────────────────────
 function UserAvatar({ name, href, active }: { name: string; href: string; active: boolean }) {
   const initials = name
     .split(" ")
@@ -81,146 +64,128 @@ function UserAvatar({ name, href, active }: { name: string; href: string; active
   return (
     <Link
       href={href}
-      className="flex items-center gap-2 outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-50 rounded-full"
+      className="flex items-center gap-2.5 outline-none focus-visible:ring-2 focus-visible:ring-[#3D5AFE] rounded-[12px] px-2 py-1 hover:bg-[#F2F3F7] transition-colors"
       title={`Profile: ${name}`}
     >
       <span
         className={[
-          "h-7 w-7 rounded-full flex items-center justify-center text-[11px] font-semibold transition-all",
+          "h-8 w-8 rounded-[12px] flex items-center justify-center text-[14px] font-bold transition-all font-display",
           active
-            ? "bg-[#0A6640] text-white ring-2 ring-white ring-opacity-30"
-            : "bg-[rgba(255,255,255,0.12)] text-white hover:bg-[rgba(255,255,255,0.2)]",
+            ? "bg-[#3D5AFE] text-white"
+            : "bg-[#F2F3F7] text-[#16161A] hover:bg-[#16161A]/10",
         ].join(" ")}
-        style={{ fontFamily: "var(--font-display, 'Space Grotesk', sans-serif)" }}
       >
         {initials}
       </span>
-      <span
-        className="text-sm hidden sm:block text-[rgba(255,255,255,0.7)] hover:text-white transition-colors"
-        style={{ fontFamily: "var(--font-body, Inter, sans-serif)" }}
-      >
+      <span className="text-[14px] font-medium hidden sm:block text-[#16161A]/80 hover:text-[#16161A] font-body">
         {name.split(" ")[0]}
       </span>
     </Link>
   );
 }
 
-// ── Navbar ─────────────────────────────────────────────────────────────────
 export function Navbar() {
   const pathname = usePathname();
   const { user, isAuthenticated, isLoading, logout } = useAuth();
+  const isAdminPath = pathname.startsWith("/admin");
 
   return (
-    <header
-      className="sticky top-0 z-50 w-full"
-      style={{
-        backgroundColor: "var(--canvas-dark, #0F1117)",
-        borderBottom: "1px solid rgba(255,255,255,0.07)",
-      }}
-    >
-      <div className="container mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
-        {/* Logo */}
+    <header className="sticky top-0 z-50 w-full bg-white border-b border-[#F2F3F7]">
+      <div className="container mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
         <Link
-          href="/"
-          className="flex items-center gap-2.5 outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-50 rounded-[4px]"
+          href={isAdminPath ? "/admin" : "/"}
+          className="flex items-center gap-3 outline-none focus-visible:ring-2 focus-visible:ring-[#3D5AFE] rounded-[12px]"
         >
-          <VaultMark className="h-7 w-7 shrink-0" />
-          <span
-            className="font-semibold text-base tracking-tight text-white"
-            style={{ fontFamily: "var(--font-display, 'Space Grotesk', sans-serif)" }}
-          >
-            PledgePay
-          </span>
+          <VaultMark className="h-8 w-8 shrink-0" />
+          <div className="flex items-center gap-2">
+            <span className="font-display font-bold text-[20px] tracking-tight text-[#16161A]">
+              PledgePay
+            </span>
+            {isAdminPath && (
+              <span className="px-2 py-0.5 text-[12px] font-bold uppercase tracking-wider bg-[#16161A] text-white rounded-[12px] font-display">
+                Admin
+              </span>
+            )}
+          </div>
         </Link>
 
-        {/* Right nav */}
-        <nav className="flex items-center gap-1" aria-label="Primary navigation">
-          {!isLoading && isAuthenticated && user ? (
+        <nav className="flex items-center gap-2" aria-label="Primary navigation">
+          {isAdminPath ? (
+            !isLoading && isAuthenticated && user ? (
+              <>
+                <UserAvatar name={user.name} href="/profile" active={pathname === "/profile"} />
+
+                <button
+                  onClick={() => logout()}
+                  title="Sign Out"
+                  className="h-9 w-9 flex items-center justify-center rounded-[12px] text-[#16161A]/60 hover:text-[#FF3D71] hover:bg-[#FF3D71]/10 transition-colors"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
+              </>
+            ) : (
+              <Link
+                href="/login"
+                className="flex items-center gap-2 h-10 px-4 text-[14px] font-medium rounded-[12px] text-[#16161A] hover:bg-[#F2F3F7] transition-colors font-body"
+              >
+                <LogIn className="h-4 w-4" />
+                <span>Sign In</span>
+              </Link>
+            )
+          ) : !isLoading && isAuthenticated && user ? (
             <>
               <NavLink
                 href="/dashboard"
                 active={pathname === "/dashboard"}
-                icon={<LayoutDashboard className="h-3.5 w-3.5" />}
+                icon={<LayoutDashboard className="h-4 w-4" />}
               >
                 Dashboard
               </NavLink>
 
               <Link
                 href="/commitments/new"
-                className={[
-                  "flex items-center gap-1.5 h-8 px-3 text-xs font-semibold rounded-[6px] transition-all ml-1",
-                  "bg-[#0A6640] text-white hover:bg-[#085535] active:bg-[#064426]",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A6640] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0F1117]",
-                ].join(" ")}
-                style={{ fontFamily: "var(--font-body, Inter, sans-serif)" }}
+                className="flex items-center gap-2 h-10 px-4 text-[14px] font-medium rounded-[12px] bg-[#3D5AFE] text-white hover:bg-[#3249cb] transition-colors font-body"
               >
-                <Plus className="h-3.5 w-3.5" />
-                New Pledge
+                <Plus className="h-4 w-4" />
+                <span>New Pledge</span>
               </Link>
 
-              <NavLink
-                href="/admin"
-                active={pathname === "/admin"}
-                icon={<ShieldCheck className="h-3.5 w-3.5" />}
-              >
-                <span className="hidden sm:inline">Admin</span>
-              </NavLink>
-
-              <span className="w-px h-4 bg-[rgba(255,255,255,0.12)] mx-1" />
+              <span className="w-px h-5 bg-[#16161A]/10 mx-1" />
 
               <UserAvatar name={user.name} href="/profile" active={pathname === "/profile"} />
 
               <button
                 onClick={() => logout()}
                 title="Sign Out"
-                className={[
-                  "h-7 w-7 flex items-center justify-center rounded-[6px] ml-1 transition-colors",
-                  "text-[rgba(255,255,255,0.4)] hover:text-[#F87171] hover:bg-[rgba(248,113,113,0.08)]",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-50",
-                ].join(" ")}
+                className="h-9 w-9 flex items-center justify-center rounded-[12px] text-[#16161A]/60 hover:text-[#FF3D71] hover:bg-[#FF3D71]/10 transition-colors"
               >
-                <LogOut className="h-3.5 w-3.5" />
+                <LogOut className="h-4 w-4" />
               </button>
             </>
           ) : (
             <>
               <Link
                 href="/commitments/new"
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-[rgba(255,255,255,0.6)] hover:text-white hover:bg-[rgba(255,255,255,0.06)] rounded-[6px] transition-colors"
-                style={{ fontFamily: "var(--font-body, Inter, sans-serif)" }}
+                className="flex items-center gap-2 px-3.5 py-2 text-[14px] font-medium text-[#16161A]/70 hover:text-[#16161A] hover:bg-[#F2F3F7] rounded-[12px] transition-colors font-body"
               >
-                <Plus className="h-3.5 w-3.5 text-[#0A6640]" />
-                Try AI Structurer
+                <Plus className="h-4 w-4 text-[#3D5AFE]" />
+                <span>AI Structurer</span>
               </Link>
-
-              <NavLink href="/admin" active={pathname === "/admin"} icon={<ShieldCheck className="h-3.5 w-3.5" />}>
-                <span className="hidden sm:inline">Admin</span>
-              </NavLink>
 
               <Link
                 href="/login"
-                className={[
-                  "flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-[6px] transition-colors",
-                  "text-[rgba(255,255,255,0.7)] border border-[rgba(255,255,255,0.15)] hover:border-[rgba(255,255,255,0.3)] hover:text-white",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-50",
-                ].join(" ")}
-                style={{ fontFamily: "var(--font-body, Inter, sans-serif)" }}
+                className="flex items-center gap-2 h-10 px-4 text-[14px] font-medium rounded-[12px] text-[#16161A] hover:bg-[#F2F3F7] transition-colors font-body"
               >
-                <LogIn className="h-3.5 w-3.5" />
-                Sign In
+                <LogIn className="h-4 w-4" />
+                <span>Sign In</span>
               </Link>
 
               <Link
                 href="/register"
-                className={[
-                  "flex items-center gap-1.5 h-8 px-3 text-xs font-semibold rounded-[6px] transition-all ml-1",
-                  "bg-[#0A6640] text-white hover:bg-[#085535]",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A6640] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0F1117]",
-                ].join(" ")}
-                style={{ fontFamily: "var(--font-body, Inter, sans-serif)" }}
+                className="flex items-center gap-2 h-10 px-4 text-[14px] font-medium rounded-[12px] bg-[#3D5AFE] text-white hover:bg-[#3249cb] transition-colors font-body ml-1"
               >
-                <UserPlus className="h-3.5 w-3.5" />
-                Register
+                <UserPlus className="h-4 w-4" />
+                <span>Register</span>
               </Link>
             </>
           )}
