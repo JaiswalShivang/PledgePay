@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -48,6 +49,7 @@ func (h *ResolutionHandler) GetCommitmentStatus(c *gin.Context) {
 
 	res, err := h.resolver.GetStatus(c.Request.Context(), id)
 	if err != nil {
+		slog.Error("GetCommitmentStatus failed", "commitment_id", id, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

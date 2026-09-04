@@ -78,6 +78,17 @@ func (r *Resolver) ResolveCommitment(ctx context.Context, commitmentID string) (
 	progress := rules.CalculateProgress(&commitment, evidenceList, now)
 	latestVerification, _ := r.verificationRepo.GetLatestByCommitmentID(ctx, commitmentID)
 
+	if commitment.Status == "COMPLETED" {
+		return &ResolutionResult{
+			Commitment:   &commitment,
+			Donation:     nil,
+			Progress:     &progress,
+			Verification: latestVerification,
+			IsResolved:   true,
+			State:        "REFUNDED",
+		}, nil
+	}
+
 	var existingDonation models.Donation
 	dErr := r.db.WithContext(ctx).
 		Preload("Charity").
@@ -112,13 +123,28 @@ func (r *Resolver) ResolveCommitment(ctx context.Context, commitmentID string) (
 		}, nil
 	}
 
-	outcome := "SUCCESS"
 	if isCompleted {
 		commitment.Status = "COMPLETED"
-	} else {
-		outcome = "FAILURE"
-		commitment.Status = "FAILED"
+		commitment.UpdatedAt = now
+		if err := r.db.WithContext(ctx).Save(&commitment).Error; err != nil {
+			return nil, fmt.Errorf("failed to update commitment status: %w", err)
+		}
+
+		// Delete any erroneous donation row for completed commitments
+		_ = r.db.WithContext(ctx).Where("commitment_id = ?", commitment.ID).Delete(&models.Donation{}).Error
+
+		return &ResolutionResult{
+			Commitment:   &commitment,
+			Donation:     nil,
+			Progress:     &progress,
+			Verification: latestVerification,
+			IsResolved:   true,
+			State:        "REFUNDED",
+		}, nil
 	}
+
+	outcome := "FAILURE"
+	commitment.Status = "FAILED"
 	commitment.UpdatedAt = now
 
 	if err := r.db.WithContext(ctx).Save(&commitment).Error; err != nil {
@@ -193,26 +219,44 @@ func (r *Resolver) ResolveCommitment(ctx context.Context, commitmentID string) (
 func (r *Resolver) GetStatus(ctx context.Context, commitmentID string) (*ResolutionResult, error) {
 	now := time.Now().UTC()
 
-	var commitment models.Commitment
-	if err := r.db.WithContext(ctx).
-		Preload("Charity").
-		Where("id = ?", commitmentID).
-		First(&commitment).Error; err != nil {
-		return nil, err
+	var commitment *models.Commitment
+	var err error
+	if r.commitmentRepo != nil {
+		commitment, err = r.commitmentRepo.GetByID(ctx, commitmentID)
+	} else if r.db != nil {
+		var comm models.Commitment
+		err = r.db.WithContext(ctx).
+			Preload("Charity").
+			Where("id = ?", commitmentID).
+			First(&comm).Error
+		commitment = &comm
+	}
+	if err != nil || commitment == nil {
+		return nil, fmt.Errorf("commitment not found: %w", err)
 	}
 
-	evidenceList, err := r.evidenceRepo.ListByCommitmentID(ctx, commitmentID)
-	if err != nil {
-		return nil, err
+	var evidenceList []models.Evidence
+	if r.evidenceRepo != nil {
+		evidenceList, _ = r.evidenceRepo.ListByCommitmentID(ctx, commitmentID)
 	}
 
-	progress := rules.CalculateProgress(&commitment, evidenceList, now)
-	latestVerification, _ := r.verificationRepo.GetLatestByCommitmentID(ctx, commitmentID)
+	progress := rules.CalculateProgress(commitment, evidenceList, now)
 
-	donation, _ := r.donationRepo.GetByCommitmentID(ctx, commitmentID)
+	var latestVerification *models.VerificationResult
+	if r.verificationRepo != nil {
+		latestVerification, _ = r.verificationRepo.GetLatestByCommitmentID(ctx, commitmentID)
+	}
+
+	var donation *models.Donation
+	if r.donationRepo != nil {
+		donation, _ = r.donationRepo.GetByCommitmentID(ctx, commitmentID)
+	}
 
 	state := commitment.Status
-	if donation != nil {
+	if commitment.Status == "COMPLETED" {
+		state = "REFUNDED"
+		donation = nil
+	} else if donation != nil {
 		if donation.Status == "PAID" {
 			state = "DONATED"
 		} else {
@@ -221,7 +265,7 @@ func (r *Resolver) GetStatus(ctx context.Context, commitmentID string) (*Resolut
 	}
 
 	return &ResolutionResult{
-		Commitment:   &commitment,
+		Commitment:   commitment,
 		Donation:     donation,
 		Progress:     &progress,
 		Verification: latestVerification,

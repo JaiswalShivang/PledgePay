@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"errors"
+	"time"
 
 	"github.com/jaiswalshivang/pledgepay/internal/models"
 	"gorm.io/gorm"
@@ -26,7 +28,21 @@ func NewPaymentRepository(db *gorm.DB) PaymentRepository {
 }
 
 func (r *paymentRepository) CreatePayment(ctx context.Context, payment *models.Payment) error {
-	return r.db.WithContext(ctx).Create(payment).Error
+	var existing models.Payment
+	err := r.db.WithContext(ctx).Where("commitment_id = ?", payment.CommitmentID).First(&existing).Error
+	if err == nil {
+		payment.ID = existing.ID
+		return r.db.WithContext(ctx).Model(&existing).Updates(map[string]interface{}{
+			"razorpay_order_id": payment.RazorpayOrderID,
+			"amount_paise":     payment.AmountPaise,
+			"currency":         payment.Currency,
+			"status":           payment.Status,
+			"updated_at":       payment.UpdatedAt,
+		}).Error
+	} else if errors.Is(err, gorm.ErrRecordNotFound) {
+		return r.db.WithContext(ctx).Create(payment).Error
+	}
+	return err
 }
 
 func (r *paymentRepository) GetPaymentByID(ctx context.Context, id string) (*models.Payment, error) {
@@ -47,7 +63,8 @@ func (r *paymentRepository) GetPaymentByOrderID(ctx context.Context, orderID str
 
 func (r *paymentRepository) UpdatePaymentStatus(ctx context.Context, id string, status string, paymentID *string, signature *string) error {
 	updates := map[string]interface{}{
-		"status": status,
+		"status":     status,
+		"updated_at": time.Now().UTC(),
 	}
 	if paymentID != nil {
 		updates["razorpay_payment_id"] = *paymentID

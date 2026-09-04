@@ -7,9 +7,13 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"regexp"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/jaiswalshivang/pledgepay/internal/config"
 	"github.com/jaiswalshivang/pledgepay/internal/models"
 	"github.com/jaiswalshivang/pledgepay/internal/payment"
@@ -147,17 +151,23 @@ func (h *PaymentHandler) CreateOrder(c *gin.Context) {
 		return
 	}
 
+	now := time.Now().UTC()
 	paymentRecord := &models.Payment{
+		ID:              uuid.New().String(),
 		CommitmentID:    commitment.ID,
 		RazorpayOrderID: orderResp.ID,
 		AmountPaise:     amountPaise,
+		Currency:        "INR",
 		Status:          "PENDING",
+		CreatedAt:       now,
+		UpdatedAt:       now,
 	}
 
 	if err := h.paymentRepo.CreatePayment(c.Request.Context(), paymentRecord); err != nil {
+		slog.Error("Failed to record payment intent", "error", err, "commitment_id", commitment.ID)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "database_error",
-			"message": "failed to record payment intent",
+			"message": "failed to record payment intent: " + err.Error(),
 		})
 		return
 	}
@@ -247,6 +257,21 @@ func (h *PaymentHandler) VerifyPayment(c *gin.Context) {
 	commitment.Status = "ACTIVE"
 	commitment.StartDate = now
 	commitment.EndDate = now.AddDate(0, 0, commitment.DurationDays)
+
+	lowerTitle := strings.ToLower(commitment.Title)
+	reMin := regexp.MustCompile(`(?i)(\d+)\s*(?:minutes?|mins?)\b`)
+	if m := reMin.FindStringSubmatch(lowerTitle); len(m) > 1 {
+		if n, err := strconv.Atoi(m[1]); err == nil && n > 0 {
+			commitment.EndDate = now.Add(time.Duration(n) * time.Minute)
+		}
+	} else {
+		reHr := regexp.MustCompile(`(?i)(\d+)\s*(?:hours?|hrs?)\b`)
+		if m := reHr.FindStringSubmatch(lowerTitle); len(m) > 1 {
+			if n, err := strconv.Atoi(m[1]); err == nil && n > 0 {
+				commitment.EndDate = now.Add(time.Duration(n) * time.Hour)
+			}
+		}
+	}
 
 	if err := h.commitmentRepo.Update(c.Request.Context(), commitment); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
