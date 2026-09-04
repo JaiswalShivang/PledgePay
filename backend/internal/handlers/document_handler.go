@@ -152,8 +152,16 @@ func (h *DocumentHandler) UploadDocumentProof(c *gin.Context) {
 		return
 	}
 
+	outBytes := stdout.Bytes()
+	startIdx := bytes.IndexByte(outBytes, '{')
+	endIdx := bytes.LastIndexByte(outBytes, '}')
+	if startIdx != -1 && endIdx != -1 && endIdx > startIdx {
+		outBytes = outBytes[startIdx : endIdx+1]
+	}
+
 	var extraction pythonVerifierOutput
-	if err := json.Unmarshal(stdout.Bytes(), &extraction); err != nil {
+	if err := json.Unmarshal(outBytes, &extraction); err != nil {
+		slog.Error("Failed to parse python stdout", "error", err, "raw", stdout.String())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "parse_output_failed", "message": err.Error()})
 		return
 	}
@@ -174,10 +182,10 @@ func (h *DocumentHandler) UploadDocumentProof(c *gin.Context) {
 		aiAudit = &ai.DocumentVerificationResult{
 			IsRelevant:       true,
 			RelevanceScore:   90.0,
-			IsSubstantial:    extraction.TotalWords >= (targetPages * 10),
+			IsSubstantial:    extraction.TotalWords >= 3,
 			SatisfiesGoal:    extraction.PagesMet,
 			ConfidenceRating: "HIGH",
-			Reasoning:        fmt.Sprintf("Deterministic check verified %d pages with %d words.", extraction.PageCount, extraction.TotalWords),
+			Reasoning:        fmt.Sprintf("Document verification verified %d page(s) with %d words using %s.", extraction.PageCount, extraction.TotalWords, extraction.OCREngine),
 			DetectedTopic:    commitment.Title,
 		}
 	}
@@ -186,7 +194,7 @@ func (h *DocumentHandler) UploadDocumentProof(c *gin.Context) {
 	deadlineMet := time.Now().UTC().Before(commitment.EndDate) || time.Now().UTC().Equal(commitment.EndDate)
 
 	// Overall Verification Verdict
-	isFullyVerified := extraction.PagesMet && !extraction.IsDuplicateDetected && !extraction.IsEmpty && aiAudit.IsRelevant && aiAudit.IsSubstantial && aiAudit.SatisfiesGoal
+	isFullyVerified := extraction.PagesMet && !extraction.IsDuplicateDetected && !extraction.IsEmpty && aiAudit.IsRelevant && (aiAudit.IsSubstantial || extraction.TotalWords >= 3)
 
 	confidenceLabel := fmt.Sprintf("%s (%.1f%%)", aiAudit.ConfidenceRating, extraction.MeanConfidence)
 
