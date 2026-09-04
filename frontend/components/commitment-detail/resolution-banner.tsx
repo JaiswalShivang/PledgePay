@@ -1,6 +1,7 @@
 "use client";
 
-import { Trophy, Heart } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { Trophy, Heart, CheckCircle2 } from "lucide-react";
 import { Commitment, ResolutionResult } from "@/lib/api-client";
 
 interface ResolutionBannerProps {
@@ -13,77 +14,155 @@ export function ResolutionBanner({ commitment, statusData }: ResolutionBannerPro
     commitment.status === "COMPLETED" || statusData?.donation?.outcome === "SUCCESS";
   const donation = statusData?.donation || commitment.donation;
   const amountINR = commitment.amount_paise / 100;
+  const bannerRef = useRef<HTMLDivElement>(null);
+
+  // One-shot settle-pulse animation on mount — the emotional payoff moment
+  useEffect(() => {
+    const el = bannerRef.current;
+    if (!el) return;
+    const cls = isSuccess ? "animate-settle-success" : "animate-settle-impact";
+    el.classList.add(cls);
+    const timer = setTimeout(() => el.classList.remove(cls), 800);
+    return () => clearTimeout(timer);
+  }, [isSuccess]);
 
   if (isSuccess) {
     return (
-      <div className="p-6 rounded-[8px] bg-[#F0FDF4] border border-[#BBF7D0] space-y-4">
-        <div className="flex items-center gap-2 text-[#166534]">
-          <Trophy className="h-5 w-5" />
-          <span className="font-semibold text-sm">Commitment Completed & 100% Refunded</span>
+      <div
+        ref={bannerRef}
+        className="w-full rounded-[14px] overflow-hidden"
+        style={{
+          background: "linear-gradient(135deg, #0A6640 0%, #065535 50%, #0A6640 100%)",
+          boxShadow: "0 4px 24px rgba(10,102,64,0.3)",
+        }}
+      >
+        {/* Top bar */}
+        <div className="flex items-center gap-3 px-6 py-5">
+          <div
+            className="h-10 w-10 rounded-full flex items-center justify-center shrink-0"
+            style={{ backgroundColor: "rgba(255,255,255,0.15)" }}
+          >
+            <Trophy className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <h2
+              className="text-base font-bold text-white"
+              style={{ fontFamily: "var(--font-display, 'Space Grotesk', sans-serif)" }}
+            >
+              Commitment Complete — Stake Refunded
+            </h2>
+            <p className="text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.65)" }}>
+              You achieved your goal of {commitment.target_count} {commitment.unit}. Well done.
+            </p>
+          </div>
         </div>
 
-        <p className="text-xs text-[#166534] leading-relaxed">
-          You achieved your goal of {commitment.target_count} {commitment.unit}! Your stake of ₹{amountINR.toLocaleString("en-IN")} was processed and a verified celebratory impact grant of ₹{amountINR.toLocaleString("en-IN")} was recorded for {commitment.charity?.name}.
-        </p>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs">
-          <div className="p-3 rounded-[6px] bg-white border border-[#BBF7D0]">
-            <div className="text-[#71717A]">Verified Milestones</div>
-            <div className="font-bold font-numeric text-[#166534] mt-0.5">
-              {statusData?.progress?.verified || commitment.target_count} / {commitment.target_count} {commitment.unit}
+        {/* Stat row */}
+        <div
+          className="grid grid-cols-1 sm:grid-cols-3 gap-px"
+          style={{ backgroundColor: "rgba(255,255,255,0.1)" }}
+        >
+          {[
+            {
+              label: "Verified Milestones",
+              value: `${statusData?.progress?.verified ?? commitment.target_count} / ${commitment.target_count} ${commitment.unit}`,
+            },
+            {
+              label: "Beneficiary Cause",
+              value: commitment.charity?.name ?? "—",
+            },
+            {
+              label: "Refund Status",
+              value: `₹${amountINR.toLocaleString("en-IN")} refunded`,
+              icon: <CheckCircle2 className="h-3.5 w-3.5 mr-1 inline" />,
+            },
+          ].map((stat) => (
+            <div
+              key={stat.label}
+              className="px-6 py-4"
+              style={{ backgroundColor: "rgba(0,0,0,0.15)" }}
+            >
+              <div className="text-[10px] font-medium uppercase tracking-wider mb-1" style={{ color: "rgba(255,255,255,0.5)" }}>
+                {stat.label}
+              </div>
+              <div
+                className="text-sm font-semibold text-white"
+                style={{ fontFamily: "var(--font-data)" }}
+              >
+                {stat.icon}{stat.value}
+              </div>
             </div>
-          </div>
-
-          <div className="p-3 rounded-[6px] bg-white border border-[#BBF7D0]">
-            <div className="text-[#71717A]">Beneficiary Cause</div>
-            <div className="font-semibold text-[#18181B] truncate mt-0.5">
-              {commitment.charity?.name}
-            </div>
-          </div>
-
-          <div className="p-3 rounded-[6px] bg-white border border-[#BBF7D0]">
-            <div className="text-[#71717A]">RazorpayX Payout ID</div>
-            <div className="font-numeric text-[#71717A] truncate mt-0.5">
-              {donation?.razorpayx_payout_id || "pout_verified_success"}
-            </div>
-          </div>
+          ))}
         </div>
       </div>
     );
   }
 
+  // Failed / donated
   return (
-    <div className="p-6 rounded-[8px] bg-[#FFF7ED] border border-[#FED7AA] space-y-4">
-      <div className="flex items-center gap-2 text-[#C2410C]">
-        <Heart className="h-5 w-5" />
-        <span className="font-semibold text-sm">Resolved — Charitable Safety Net Dispatched</span>
+    <div
+      ref={bannerRef}
+      className="w-full rounded-[14px] overflow-hidden"
+      style={{
+        background: "linear-gradient(135deg, #C44B0A 0%, #A33D08 50%, #C44B0A 100%)",
+        boxShadow: "0 4px 24px rgba(196,75,10,0.3)",
+      }}
+    >
+      <div className="flex items-center gap-3 px-6 py-5">
+        <div
+          className="h-10 w-10 rounded-full flex items-center justify-center shrink-0"
+          style={{ backgroundColor: "rgba(255,255,255,0.15)" }}
+        >
+          <Heart className="h-5 w-5 text-white" />
+        </div>
+        <div>
+          <h2
+            className="text-base font-bold text-white"
+            style={{ fontFamily: "var(--font-display, 'Space Grotesk', sans-serif)" }}
+          >
+            Resolved — Charitable Impact Dispatched
+          </h2>
+          <p className="text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.65)" }}>
+            Your ₹{amountINR.toLocaleString("en-IN")} stake has been transferred to{" "}
+            <strong className="text-white">{commitment.charity?.name}</strong>.
+          </p>
+        </div>
       </div>
 
-      <p className="text-xs text-[#9A3412] leading-relaxed">
-        Your deadline has concluded. As agreed upfront, your ₹{amountINR.toLocaleString("en-IN")} stake has been transferred directly to <strong className="text-[#18181B]">{commitment.charity?.name}</strong> to fund their ongoing mission.
-      </p>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs">
-        <div className="p-3 rounded-[6px] bg-white border border-[#FED7AA]">
-          <div className="text-[#71717A]">Final Progress</div>
-          <div className="font-bold font-numeric text-[#18181B] mt-0.5">
-            {statusData?.progress?.verified || 0} / {commitment.target_count} {commitment.unit}
+      <div
+        className="grid grid-cols-1 sm:grid-cols-3 gap-px"
+        style={{ backgroundColor: "rgba(255,255,255,0.1)" }}
+      >
+        {[
+          {
+            label: "Final Progress",
+            value: `${statusData?.progress?.verified ?? 0} / ${commitment.target_count} ${commitment.unit}`,
+          },
+          {
+            label: "Charity Recipient",
+            value: commitment.charity?.name ?? "—",
+          },
+          {
+            label: "Receipt Reference",
+            value: donation?.razorpayx_payout_id ?? "pout_impact_settled",
+          },
+        ].map((stat) => (
+          <div
+            key={stat.label}
+            className="px-6 py-4"
+            style={{ backgroundColor: "rgba(0,0,0,0.15)" }}
+          >
+            <div className="text-[10px] font-medium uppercase tracking-wider mb-1" style={{ color: "rgba(255,255,255,0.5)" }}>
+              {stat.label}
+            </div>
+            <div
+              className="text-sm font-semibold text-white truncate"
+              style={{ fontFamily: "var(--font-data)" }}
+            >
+              {stat.value}
+            </div>
           </div>
-        </div>
-
-        <div className="p-3 rounded-[6px] bg-white border border-[#FED7AA]">
-          <div className="text-[#71717A]">Charity Donated</div>
-          <div className="font-semibold text-[#18181B] truncate mt-0.5">
-            {commitment.charity?.name}
-          </div>
-        </div>
-
-        <div className="p-3 rounded-[6px] bg-white border border-[#FED7AA]">
-          <div className="text-[#71717A]">Receipt Reference</div>
-          <div className="font-numeric text-[#71717A] truncate mt-0.5">
-            {donation?.razorpayx_payout_id || "pout_impact_settled"}
-          </div>
-        </div>
+        ))}
       </div>
     </div>
   );

@@ -1,49 +1,79 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-export interface InputProps
-  extends React.InputHTMLAttributes<HTMLInputElement> {
+export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
   error?: string;
+  /** dark — for use on dark canvas surfaces (auth left panel, dark cards) */
+  surface?: "light" | "dark";
 }
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type, leftIcon, rightIcon, error, disabled, ...props }, ref) => {
+  ({ className, type, leftIcon, rightIcon, error, surface = "light", ...props }, ref) => {
+    const isDark = surface === "dark";
+
     return (
-      <div className="w-full">
-        <div className="relative flex items-center w-full">
+      <div className="w-full space-y-1">
+        <div className="relative flex items-center">
           {leftIcon && (
-            <div className="absolute left-3 flex items-center pointer-events-none text-[#71717A]">
+            <span
+              className={cn(
+                "absolute left-3 shrink-0",
+                isDark ? "text-[rgba(255,255,255,0.4)]" : "text-[#6B7485]"
+              )}
+            >
               {leftIcon}
-            </div>
+            </span>
           )}
           <input
             type={type}
+            ref={ref}
             className={cn(
-              "flex h-9 w-full rounded-[8px] bg-white border border-[#D1D5DB] px-3 py-1.5 text-sm text-[#18181B] placeholder:text-[#9CA3AF] transition-colors focus-visible:outline-none focus-visible:border-[#047857] focus-visible:ring-1 focus-visible:ring-[#047857] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:opacity-75",
+              "w-full text-sm transition-all duration-150 outline-none",
+              "rounded-[8px] py-2.5 px-3",
+              "focus-visible:ring-2",
               leftIcon && "pl-9",
               rightIcon && "pr-9",
-              error && "border-red-500 focus-visible:border-red-500 focus-visible:ring-red-500",
+              isDark
+                ? [
+                    "bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.1)]",
+                    "text-white placeholder:text-[rgba(255,255,255,0.3)]",
+                    "focus-visible:border-[#0A6640] focus-visible:ring-[rgba(10,102,64,0.25)]",
+                    error
+                      ? "border-[#F87171] focus-visible:border-[#F87171] focus-visible:ring-[rgba(248,113,113,0.25)]"
+                      : "",
+                  ].join(" ")
+                : [
+                    "bg-white border border-[#D8DBE0]",
+                    "text-[#111318] placeholder:text-[#9CA3AF]",
+                    "focus-visible:border-[#0A6640] focus-visible:ring-[rgba(10,102,64,0.15)]",
+                    error
+                      ? "border-[#F87171] focus-visible:border-[#F87171] focus-visible:ring-[rgba(248,113,113,0.2)]"
+                      : "",
+                  ].join(" "),
               className
             )}
-            ref={ref}
-            disabled={disabled}
             {...props}
           />
           {rightIcon && (
-            <div className="absolute right-3 flex items-center text-[#71717A]">
+            <span
+              className={cn(
+                "absolute right-3 shrink-0",
+                isDark ? "text-[rgba(255,255,255,0.4)]" : "text-[#6B7485]"
+              )}
+            >
               {rightIcon}
-            </div>
+            </span>
           )}
         </div>
         {error && (
-          <p className="mt-1 text-xs text-red-600">{error}</p>
+          <p className="text-[11px] text-[#DC2626] leading-tight pl-0.5">{error}</p>
         )}
       </div>
     );
   }
 );
-Input.displayName = "Input";
 
+Input.displayName = "Input";
 export { Input };

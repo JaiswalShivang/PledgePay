@@ -1,73 +1,80 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-export interface ProgressBarProps extends React.HTMLAttributes<HTMLDivElement> {
-  value: number; // 0 to 100
-  max?: number;
-  label?: string;
-  subLabel?: string;
+type ProgressStatus = "on_track" | "at_risk" | "behind" | "completed" | "failed" | "verifying";
+
+interface ProgressBarProps {
+  value: number; // 0–100
+  status?: ProgressStatus;
+  size?: "xs" | "sm" | "md";
   showValue?: boolean;
-  status?: "default" | "on_track" | "at_risk" | "behind" | "completed" | "failed";
-  size?: "sm" | "md" | "lg";
+  className?: string;
+  /** If true, plays the verify-scan shimmer on active states */
+  animated?: boolean;
 }
+
+const TRACK_COLORS: Record<ProgressStatus, string> = {
+  on_track:  "bg-[#D1FAE5]",
+  at_risk:   "bg-[#FEF3C7]",
+  behind:    "bg-[#FED7AA]",
+  completed: "bg-[#D1FAE5]",
+  failed:    "bg-[#FED7AA]",
+  verifying: "bg-[#DBEAFE]",
+};
+
+const FILL_COLORS: Record<ProgressStatus, string> = {
+  on_track:  "bg-[#0A6640]",
+  at_risk:   "bg-[#B45309]",
+  behind:    "bg-[#C44B0A]",
+  completed: "bg-[#0A6640]",
+  failed:    "bg-[#C44B0A]",
+  verifying: "bg-[#1E4FD8]",
+};
+
+const SIZE_STYLES = {
+  xs: "h-1",
+  sm: "h-1.5",
+  md: "h-2",
+};
 
 export function ProgressBar({
   value,
-  max = 100,
-  label,
-  subLabel,
-  showValue = true,
-  status = "default",
-  size = "md",
+  status = "on_track",
+  size = "sm",
+  showValue = false,
   className,
-  ...props
+  animated = false,
 }: ProgressBarProps) {
-  const percentage = Math.min(100, Math.max(0, (value / max) * 100));
-
-  const statusColors = {
-    default: "bg-[#047857]",
-    on_track: "bg-[#047857]",
-    at_risk: "bg-[#D97706]",
-    behind: "bg-[#DC2626]",
-    completed: "bg-[#047857]",
-    failed: "bg-[#DC2626]",
-  };
-
-  const heightClasses = {
-    sm: "h-1.5",
-    md: "h-2",
-    lg: "h-3",
-  };
+  const clamped = Math.min(100, Math.max(0, value));
+  const isActive = status === "on_track" || status === "verifying";
 
   return (
-    <div className={cn("w-full space-y-1", className)} {...props}>
-      {(label || showValue) && (
-        <div className="flex items-center justify-between text-xs text-[#52525B]">
-          <span className="font-medium text-[#18181B]">{label}</span>
-          {showValue && (
-            <span className="font-numeric font-medium text-[#18181B]">
-              {Math.round(percentage)}%
-            </span>
-          )}
+    <div className={cn("w-full space-y-1", className)}>
+      {showValue && (
+        <div className="flex justify-end">
+          <span
+            className="font-data text-[11px]"
+            style={{ color: status === "failed" ? "#C44B0A" : status === "completed" ? "#0A6640" : "#4B5263" }}
+          >
+            {Math.round(clamped)}%
+          </span>
         </div>
       )}
       <div
         className={cn(
-          "w-full rounded-full bg-[#E5E7EB] overflow-hidden",
-          heightClasses[size]
+          "w-full rounded-full overflow-hidden",
+          SIZE_STYLES[size],
+          TRACK_COLORS[status]
         )}
       >
         <div
           className={cn(
-            "h-full rounded-full transition-all duration-300 ease-out",
-            statusColors[status]
+            "h-full rounded-full transition-all duration-500 ease-out",
+            animated && isActive ? "animate-verify-scan" : FILL_COLORS[status]
           )}
-          style={{ width: `${percentage}%` }}
+          style={{ width: `${clamped}%` }}
         />
       </div>
-      {subLabel && (
-        <div className="text-[11px] text-[#71717A] font-numeric">{subLabel}</div>
-      )}
     </div>
   );
 }

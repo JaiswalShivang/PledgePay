@@ -1,23 +1,35 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 import { Navbar } from "@/components/navbar";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-display",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const inter = Inter({
+  variable: "--font-body",
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-data",
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
   title: "PledgePay — Proof-of-Commitment Escrow",
   description:
-    "Lock stakes into escrow commitments verified by GitHub activity and Groq AI.",
+    "Stake real money on your code goals. Verified by GitHub activity and AI. Missed? Your pledge funds a verified charity.",
 };
 
 export default function RootLayout({
@@ -28,13 +40,34 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${spaceGrotesk.variable} ${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-[#F8F9FA] text-[#18181B]">
+      <body
+        className="min-h-full flex flex-col"
+        style={{
+          backgroundColor: "var(--canvas-fog)",
+          color: "var(--ink-primary)",
+          fontFamily: "var(--font-body), Inter, sans-serif",
+        }}
+      >
+        <Script
+          src="https://checkout.razorpay.com/v1/checkout.js"
+          strategy="beforeInteractive"
+        />
         <Providers>
           <Navbar />
           <main className="flex-1 flex flex-col">{children}</main>
-          <footer className="border-t border-[#E4E7EB] bg-[#FFFFFF] py-6 text-center text-xs text-[#71717A]">
+          <footer
+            style={{
+              borderTop: "1px solid var(--border-subtle)",
+              backgroundColor: "var(--canvas-dark)",
+              color: "var(--ink-inverse-muted)",
+              padding: "20px 16px",
+              textAlign: "center",
+              fontSize: "12px",
+              fontFamily: "var(--font-data)",
+            }}
+          >
             PledgePay &copy; 2026 &bull; Proof-of-Commitment Escrow Protocol
           </footer>
         </Providers>
