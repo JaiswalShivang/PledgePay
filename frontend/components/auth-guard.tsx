@@ -22,9 +22,9 @@ export function AuthGuard({ children }: AuthGuardProps) {
   if (isLoading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="flex flex-col items-center gap-2 text-xs text-[#71717A]">
-          <Loader2 className="h-6 w-6 animate-spin text-[#047857]" />
-          <span>Verifying authentication...</span>
+        <div className="flex flex-col items-center gap-2 text-[14px] text-[#16161A]/60 font-body">
+          <Loader2 className="h-6 w-6 animate-spin text-[#3D5AFE]" />
+          <span>Verifying session…</span>
         </div>
       </div>
     );

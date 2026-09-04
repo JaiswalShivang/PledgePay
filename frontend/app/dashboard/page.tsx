@@ -5,11 +5,10 @@ import { useCurrentTimestampMs } from "@/hooks/use-clock";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { AuthGuard } from "@/components/auth-guard";
-import { DemoControls } from "@/components/demo-controls";
 import { IntegrationOnboardingBanner } from "@/components/integration-onboarding-banner";
 import { apiClient, DashboardResponse, DashboardItem } from "@/lib/api-client";
 import { useAuth } from "@/hooks/use-auth";
-import { Badge, ProgressBar, Alert, Tabs, TabsList, TabsTrigger } from "@/components/ui";
+import { Badge, ProgressBar, Alert, Tabs, TabsList, TabsTrigger, Button } from "@/components/ui";
 import {
   Plus,
   RefreshCw,
@@ -21,71 +20,60 @@ import {
   Lock,
 } from "lucide-react";
 
-// ── Stat Tile ────────────────────────────────────────────────────────────────
 function StatTile({
   label,
   value,
   sub,
-  accent,
-  wide,
+  accentColor,
+  icon,
 }: {
   label: string;
   value: string;
   sub?: string;
-  accent: "escrow" | "blue" | "ember" | "neutral";
-  wide?: boolean;
+  accentColor: string;
+  icon: React.ReactNode;
 }) {
-  const accentColor =
-    accent === "escrow" ? "#0A6640" :
-    accent === "blue"   ? "#1E4FD8" :
-    accent === "ember"  ? "#C44B0A" : "#111318";
-
-  const accentBg =
-    accent === "escrow" ? "rgba(10,102,64,0.06)" :
-    accent === "blue"   ? "rgba(30,79,216,0.06)" :
-    accent === "ember"  ? "rgba(196,75,10,0.06)" : "transparent";
-
   return (
-    <div
-      className={`rounded-[12px] p-5 flex flex-col justify-between gap-3 ${wide ? "sm:col-span-2" : ""}`}
-      style={{
-        backgroundColor: "#FFFFFF",
-        border: "1px solid #E8EAED",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-      }}
-    >
-      <div className="flex items-start justify-between">
-        <span className="text-xs font-medium text-[#6B7485]">{label}</span>
+    <div className="rounded-[12px] p-6 bg-white border border-[#F2F3F7] flex flex-col justify-between gap-4">
+      <div className="flex items-center justify-between">
+        <span className="text-[14px] font-medium text-[#16161A]/70 font-body">{label}</span>
         <div
-          className="h-6 w-6 rounded-[6px] flex items-center justify-center"
-          style={{ backgroundColor: accentBg }}
+          className="h-8 w-8 rounded-[12px] flex items-center justify-center text-white"
+          style={{ backgroundColor: accentColor }}
         >
-          {accent === "escrow" && <Lock className="h-3.5 w-3.5" style={{ color: accentColor }} />}
-          {accent === "blue"   && <RefreshCw className="h-3.5 w-3.5" style={{ color: accentColor }} />}
-          {accent === "ember"  && <Heart className="h-3.5 w-3.5" style={{ color: accentColor }} />}
-          {accent === "neutral" && <Target className="h-3.5 w-3.5" style={{ color: accentColor }} />}
+          {icon}
         </div>
       </div>
       <div>
         <div
-          className="font-bold font-data leading-none"
-          style={{
-            fontSize: wide ? "2rem" : "1.6rem",
-            color: accentColor,
-            fontFamily: "var(--font-data, 'JetBrains Mono', monospace)",
-          }}
+          className="font-bold font-display text-[32px] leading-tight"
+          style={{ color: accentColor }}
         >
           {value}
         </div>
         {sub && (
-          <div className="text-[11px] text-[#6B7485] mt-1">{sub}</div>
+          <div className="text-[14px] text-[#16161A]/60 mt-1 font-body">{sub}</div>
         )}
       </div>
     </div>
   );
 }
 
-// ── Commitment Row ───────────────────────────────────────────────────────────
+function StatTileSkeleton() {
+  return (
+    <div className="rounded-[12px] p-6 bg-white border border-[#F2F3F7] flex flex-col justify-between gap-4 animate-pulse">
+      <div className="flex items-center justify-between">
+        <div className="h-4 w-24 bg-[#F2F3F7] rounded-[12px]" />
+        <div className="h-8 w-8 rounded-[12px] bg-[#F2F3F7]" />
+      </div>
+      <div className="space-y-2">
+        <div className="h-8 w-32 bg-[#F2F3F7] rounded-[12px]" />
+        <div className="h-4 w-20 bg-[#F2F3F7] rounded-[12px]" />
+      </div>
+    </div>
+  );
+}
+
 function CommitmentRow({
   item,
   currentTimestamp,
@@ -101,13 +89,12 @@ function CommitmentRow({
 }) {
   const { commitment: comm, progress: prog } = item;
   const amountINR = comm.amount_paise / 100;
-  const paceStatus = prog.status === "ON_TRACK" ? "on_track" : prog.status === "AT_RISK" ? "at_risk" : "behind";
+  const paceVariant = comm.status === "COMPLETED" ? "verified" : comm.status === "FAILED" ? "charity" : prog.status === "ON_TRACK" ? "verified" : "stake";
 
-  const leftBorderColor =
-    comm.status === "COMPLETED" ? "#0A6640" :
-    comm.status === "FAILED"    ? "#C44B0A" :
-    prog.status === "ON_TRACK"  ? "#0A6640" :
-    prog.status === "AT_RISK"   ? "#B45309" : "#C44B0A";
+  const borderColor =
+    comm.status === "COMPLETED" ? "#00C896" :
+    comm.status === "FAILED"    ? "#FF3D71" :
+    comm.status === "ACTIVE"    ? "#3D5AFE" : "#FF6B35";
 
   const isExpired = comm.status === "ACTIVE" && comm.end_date && currentTimestamp > 0 &&
     new Date(comm.end_date).getTime() <= currentTimestamp;
@@ -115,89 +102,68 @@ function CommitmentRow({
   return (
     <Link href={`/commitments/${comm.id}`} className="block group" aria-label={`View commitment: ${comm.title}`}>
       <div
-        className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-[10px] bg-white transition-all duration-150 group-hover:shadow-md"
-        style={{
-          border: "1px solid #E8EAED",
-          borderLeft: `4px solid ${leftBorderColor}`,
-        }}
+        className="flex flex-col sm:flex-row sm:items-center gap-4 p-5 rounded-[12px] bg-white transition-colors border border-[#F2F3F7] hover:border-[#3D5AFE]"
+        style={{ borderLeftWidth: "4px", borderLeftColor: borderColor }}
       >
-        {/* Left: title + meta */}
-        <div className="flex-1 min-w-0 space-y-2">
+        <div className="flex-1 min-w-0 space-y-2.5">
           <div className="flex flex-wrap items-center gap-2">
             {getStatusBadge(comm.status, prog.status)}
-            <span
-              className="text-xs px-1.5 py-0.5 rounded-[4px] font-medium"
-              style={
-                comm.evidence_type === "codeforces_submissions"
-                  ? { backgroundColor: "#FFF7ED", color: "#C44B0A", border: "1px solid #FDBA74" }
-                  : { backgroundColor: "#EFF6FF", color: "#1E4FD8", border: "1px solid #93C5FD" }
-              }
-            >
+            <span className="text-[14px] px-2.5 py-0.5 rounded-[12px] font-medium font-body bg-[#F2F3F7] text-[#16161A]">
               {comm.evidence_type === "codeforces_submissions" ? "Codeforces" : "GitHub"}
             </span>
           </div>
-          <h3
-            className="text-sm font-semibold text-[#111318] truncate group-hover:text-[#0A6640] transition-colors"
-            style={{ fontFamily: "var(--font-display, 'Space Grotesk', sans-serif)" }}
-          >
+          <h3 className="text-[16px] font-bold text-[#16161A] truncate group-hover:text-[#3D5AFE] transition-colors font-display">
             {comm.title}
           </h3>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#6B7485]">
-            <span className="font-data">{formatDurationText(comm.title, comm.duration_days)}</span>
-            <span className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              <span className="font-data">{formatTimeRemaining(comm.end_date, prog.days_remaining)}</span>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[14px] text-[#16161A]/60 font-body">
+            <span className="font-display font-medium">{formatDurationText(comm.title, comm.duration_days)}</span>
+            <span className="flex items-center gap-1.5">
+              <Clock className="h-3.5 w-3.5" />
+              <span className="font-display">{formatTimeRemaining(comm.end_date, prog.days_remaining)}</span>
             </span>
             {comm.charity && (
-              <span className="flex items-center gap-1 text-[#C44B0A]">
-                <Heart className="h-3 w-3" />
-                <span>{comm.charity.name}</span>
+              <span className="flex items-center gap-1.5 text-[#FF3D71]">
+                <Heart className="h-3.5 w-3.5" />
+                <span className="font-medium">{comm.charity.name}</span>
               </span>
             )}
             {!comm.charity && comm.github_repo && (
-              <span className="flex items-center gap-1">
-                <GitBranch className="h-3 w-3" />
-                <span className="font-data">{comm.github_repo}</span>
+              <span className="flex items-center gap-1.5">
+                <GitBranch className="h-3.5 w-3.5" />
+                <span>{comm.github_repo}</span>
               </span>
             )}
           </div>
-          <div className="pt-0.5">
-            <ProgressBar value={prog.progress_pct} status={paceStatus} size="xs" animated={comm.status === "ACTIVE"} />
+          <div className="pt-1">
+            <ProgressBar value={prog.progress_pct} variant={paceVariant} size="sm" />
           </div>
         </div>
 
-        {/* Right: stake + progress */}
-        <div className="sm:text-right shrink-0 space-y-1">
-          <div
-            className="text-base font-bold font-data text-[#111318]"
-            style={{ fontFamily: "var(--font-data)" }}
-          >
+        <div className="sm:text-right shrink-0 space-y-1.5">
+          <div className="text-[20px] font-bold font-display text-[#FF6B35]">
             ₹{amountINR.toLocaleString("en-IN")}
           </div>
-          <div className="text-[11px] text-[#6B7485] font-data">
+          <div className="text-[14px] text-[#16161A]/60 font-display">
             {prog.verified} / {prog.target} {comm.unit}
           </div>
           {isExpired && (
-            <div
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] text-[11px] font-medium"
-              style={{ backgroundColor: "#FFF7ED", color: "#C44B0A", border: "1px solid #FDBA74" }}
-            >
-              <RefreshCw className="h-3 w-3 animate-spin" />
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[12px] text-[14px] font-medium bg-[#FF6B35] text-white">
+              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
               Auto-settling…
             </div>
           )}
           {comm.status === "FAILED" && (
-            <div className="text-[11px] font-medium text-[#C44B0A]">
-              ✓ Donated to {comm.charity?.name || "Charity"}
+            <div className="text-[14px] font-medium text-[#FF3D71]">
+              Donated to {comm.charity?.name || "Charity"}
             </div>
           )}
           {comm.status === "COMPLETED" && (
-            <div className="text-[11px] font-medium text-[#0A6640]">
-              ✓ Stake Refunded
+            <div className="text-[14px] font-medium text-[#00C896]">
+              Stake Refunded
             </div>
           )}
-          <div className="hidden sm:flex justify-end mt-1">
-            <ArrowRight className="h-3.5 w-3.5 text-[#B0B7C3] group-hover:text-[#0A6640] transition-colors" />
+          <div className="hidden sm:flex justify-end pt-1">
+            <ArrowRight className="h-4 w-4 text-[#16161A]/40 group-hover:text-[#3D5AFE] transition-colors" />
           </div>
         </div>
       </div>
@@ -205,7 +171,6 @@ function CommitmentRow({
   );
 }
 
-// ── Page ─────────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const [filter, setFilter] = useState<string>("ALL");
   const { user, isLoading: authLoading } = useAuth();
@@ -253,7 +218,7 @@ export default function DashboardPage() {
       queryClient.invalidateQueries({ queryKey: ["commitments"] });
       refetch();
     } catch (err) {
-      console.error("Failed to auto-settle:", err);
+      console.error(err);
     }
   }, [queryClient, refetch]);
 
@@ -303,21 +268,20 @@ export default function DashboardPage() {
       case "ACTIVE":
         return (
           <Badge
-            variant={pace === "ON_TRACK" ? "active" : pace === "AT_RISK" ? "pending" : "failed"}
+            variant={pace === "ON_TRACK" ? "verified" : "stake"}
             size="sm"
-            dot={pace === "ON_TRACK"}
           >
             {pace === "ON_TRACK" ? "On Track" : pace === "AT_RISK" ? "At Risk" : "Behind"}
           </Badge>
         );
       case "COMPLETED":
-        return <Badge variant="completed" size="sm">Completed</Badge>;
+        return <Badge variant="verified" size="sm">Completed</Badge>;
       case "FAILED":
-        return <Badge variant="impact" size="sm">Impact Donated</Badge>;
+        return <Badge variant="charity" size="sm">Impact Donated</Badge>;
       case "PAYMENT_PENDING":
-        return <Badge variant="pending" size="sm">Payment Pending</Badge>;
+        return <Badge variant="stake" size="sm">Payment Pending</Badge>;
       default:
-        return <Badge variant="default" size="sm">Draft</Badge>;
+        return <Badge variant="neutral" size="sm">Draft</Badge>;
     }
   };
 
@@ -346,103 +310,94 @@ export default function DashboardPage() {
     if (mMin) return `${mMin[1]}min`;
     const mHr = lower.match(/(\d+)\s*(?:hours?|hrs?)\b/);
     if (mHr) return `${mHr[1]}hr`;
-    return `${durationDays}${durationDays === 1 ? "d" : "d"}`;
+    return `${durationDays}d`;
   };
 
   return (
     <AuthGuard>
-      <div className="w-full" style={{ backgroundColor: "#F5F6F8", minHeight: "calc(100vh - 56px)" }}>
-        <div className="container mx-auto max-w-5xl px-4 py-8 space-y-6">
+      <div className="w-full bg-white min-h-[calc(100vh-64px)]">
+        <div className="container mx-auto max-w-5xl px-4 py-10 space-y-8">
 
           {showBanner && <IntegrationOnboardingBanner onDismiss={handleDismissBanner} />}
 
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h1
-                className="text-2xl font-bold text-[#111318]"
-                style={{ fontFamily: "var(--font-display, 'Space Grotesk', sans-serif)" }}
-              >
-                Dashboard
-              </h1>
-              <p className="text-xs text-[#6B7485] mt-0.5">
-                Active escrow custody, code verification, and charitable impact.
+              <div className="flex items-center gap-3">
+                <h1 className="text-section text-[#16161A]">
+                  Dashboard
+                </h1>
+                {isFetching && !isLoading && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[12px] bg-[#3D5AFE]/10 text-[#3D5AFE] text-[14px] font-medium font-body">
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    Syncing…
+                  </span>
+                )}
+              </div>
+              <p className="text-[14px] text-[#16161A]/70 mt-1 font-body">
+                Active escrow custody, milestone progress, and verified charitable impact.
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <button
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => refetch()}
                 disabled={isFetching}
-                className="flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-[6px] transition-colors border border-[#D8DBE0] bg-white text-[#4B5263] hover:bg-[#F5F6F8] disabled:opacity-50"
+                leftIcon={<RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />}
               >
-                <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
                 Refresh
-              </button>
-              <Link
-                href="/commitments/new"
-                className="flex items-center gap-1.5 h-8 px-3 text-xs font-semibold rounded-[6px] text-white transition-colors"
-                style={{ backgroundColor: "#0A6640", fontFamily: "var(--font-body)" }}
-              >
-                <Plus className="h-3.5 w-3.5" />
-                New Pledge
+              </Button>
+              <Link href="/commitments/new">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  leftIcon={<Plus className="h-4 w-4" />}
+                >
+                  New Pledge
+                </Button>
               </Link>
             </div>
           </div>
 
-          {/* ── Asymmetric Stat Tiles ──────────────────────────────── */}
-          {stats && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {/* Escrow tile: 2-column wide */}
+          {isLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {[1, 2, 3, 4].map((i) => (
+                <StatTileSkeleton key={i} />
+              ))}
+            </div>
+          ) : stats ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <StatTile
                 label="Total in Escrow"
                 value={`₹${(stats.total_pledged_paise / 100).toLocaleString("en-IN")}`}
                 sub={`${stats.active_commitments_count} active commitment${stats.active_commitments_count !== 1 ? "s" : ""}`}
-                accent="escrow"
-                wide
+                accentColor="#FF6B35"
+                icon={<Lock className="h-4 w-4" />}
               />
               <StatTile
-                label="Active"
+                label="Active Commitments"
                 value={String(stats.active_commitments_count)}
-                accent="blue"
+                sub="In progress"
+                accentColor="#3D5AFE"
+                icon={<RefreshCw className="h-4 w-4" />}
               />
               <StatTile
-                label="Completed"
+                label="Completed Milestones"
                 value={String(stats.completed_count)}
-                accent="neutral"
+                sub="100% principal refunded"
+                accentColor="#00C896"
+                icon={<Target className="h-4 w-4" />}
               />
-              {/* Charity donated — full row below on small, normal tile on large */}
-              <div className="col-span-2 sm:col-span-4">
-                <div
-                  className="rounded-[12px] p-4 flex items-center justify-between"
-                  style={{
-                    backgroundColor: "rgba(196,75,10,0.06)",
-                    border: "1px solid rgba(196,75,10,0.2)",
-                  }}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="h-8 w-8 rounded-[8px] flex items-center justify-center"
-                      style={{ backgroundColor: "rgba(196,75,10,0.12)" }}
-                    >
-                      <Heart className="h-4 w-4 text-[#C44B0A]" />
-                    </div>
-                    <div>
-                      <div className="text-xs font-medium text-[#6B7485]">Total Donated to Charity</div>
-                      <div
-                        className="text-xl font-bold font-data text-[#C44B0A]"
-                        style={{ fontFamily: "var(--font-data)" }}
-                      >
-                        ₹{(stats.total_donated_paise / 100).toLocaleString("en-IN")}
-                      </div>
-                    </div>
-                  </div>
-                  <span className="text-xs text-[#C44B0A] opacity-60">via RazorpayX payout</span>
-                </div>
-              </div>
+              <StatTile
+                label="Total Donated to Charity"
+                value={`₹${(stats.total_donated_paise / 100).toLocaleString("en-IN")}`}
+                sub="Sent to accredited causes"
+                accentColor="#FF3D71"
+                icon={<Heart className="h-4 w-4" />}
+              />
             </div>
-          )}
+          ) : null}
 
-          {/* Filter Tabs */}
           <div>
             <Tabs defaultValue="ALL" value={filter} onValueChange={setFilter}>
               <TabsList>
@@ -455,11 +410,20 @@ export default function DashboardPage() {
             </Tabs>
           </div>
 
-          {/* Commitment List */}
           {isLoading ? (
             <div className="space-y-3">
               {[1, 2, 3].map((n) => (
-                <div key={n} className="h-28 rounded-[10px] skeleton" />
+                <div key={n} className="p-5 rounded-[12px] bg-white border border-[#F2F3F7] animate-pulse space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="h-5 w-48 bg-[#F2F3F7] rounded-[12px]" />
+                    <div className="h-6 w-20 bg-[#F2F3F7] rounded-[12px]" />
+                  </div>
+                  <div className="h-3 w-full bg-[#F2F3F7] rounded-[12px]" />
+                  <div className="flex items-center justify-between pt-1">
+                    <div className="h-4 w-32 bg-[#F2F3F7] rounded-[12px]" />
+                    <div className="h-4 w-24 bg-[#F2F3F7] rounded-[12px]" />
+                  </div>
+                </div>
               ))}
             </div>
           ) : isError ? (
@@ -467,35 +431,30 @@ export default function DashboardPage() {
               {(error as Error)?.message || "An unexpected error occurred."}
             </Alert>
           ) : filteredItems.length === 0 ? (
-            <div
-              className="p-10 text-center rounded-[12px] space-y-4"
-              style={{ backgroundColor: "#FFFFFF", border: "1px solid #E8EAED" }}
-            >
-              <Target className="mx-auto h-8 w-8 text-[#B0B7C3]" />
+            <div className="p-12 text-center rounded-[12px] space-y-5 bg-white border border-[#F2F3F7]">
+              <Target className="mx-auto h-10 w-10 text-[#16161A]/30" />
               <div className="space-y-1">
-                <h3
-                  className="text-sm font-semibold text-[#111318]"
-                  style={{ fontFamily: "var(--font-display)" }}
-                >
+                <h3 className="text-subhead text-[#16161A]">
                   No commitments found
                 </h3>
-                <p className="text-xs text-[#6B7485]">
+                <p className="text-[14px] text-[#16161A]/60 font-body">
                   {filter === "ALL"
                     ? "You haven't created any commitments yet."
                     : `No commitments match the "${filter}" filter.`}
                 </p>
               </div>
-              <Link
-                href="/commitments/new"
-                className="inline-flex items-center gap-2 h-9 px-5 text-sm font-semibold text-white rounded-[8px] transition-all"
-                style={{ backgroundColor: "#0A6640", fontFamily: "var(--font-body)" }}
-              >
-                <Plus className="h-4 w-4" />
-                Create a Commitment
+              <Link href="/commitments/new">
+                <Button
+                  variant="primary"
+                  size="md"
+                  leftIcon={<Plus className="h-4 w-4" />}
+                >
+                  Create a Commitment
+                </Button>
               </Link>
             </div>
           ) : (
-            <div className="space-y-2.5">
+            <div className="space-y-3">
               {filteredItems.map((item: DashboardItem) => (
                 <CommitmentRow
                   key={item.commitment.id}
@@ -508,8 +467,6 @@ export default function DashboardPage() {
               ))}
             </div>
           )}
-
-          <DemoControls />
         </div>
       </div>
     </AuthGuard>

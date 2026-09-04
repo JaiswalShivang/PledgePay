@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient, HealthResponse } from "@/lib/api-client";
 import { useAuth } from "@/hooks/use-auth";
-import { ArrowRight, Target } from "lucide-react";
+import { ArrowRight, Target, Heart, CheckCircle2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const SAMPLE_GOALS = [
   "Solve 20 DSA problems in 7 days",
@@ -18,57 +19,53 @@ const BENEFICIARY_CAUSES = [
   {
     name: "Educate Girls India",
     category: "Education",
-    desc: "Mobilizes rural communities for primary education across underserved districts.",
-    color: "#1E4FD8",
+    desc: "Mobilizes rural communities for primary schooling across underserved districts.",
+    impact: "Provides 1 year of girl-child schooling per ₹2,500 pledge",
   },
   {
     name: "Akshaya Patra Foundation",
     category: "Poverty Relief",
-    desc: "Eliminates classroom hunger through mid-day school meal programs.",
-    color: "#0A6640",
+    desc: "Eliminates classroom hunger through wholesome mid-day school meal programs.",
+    impact: "Sponsors 1,000 mid-day meals for primary students",
   },
   {
     name: "Sankara Eye Foundation",
     category: "Healthcare",
-    desc: "Provides free eye surgeries to eliminate curable blindness.",
-    color: "#C44B0A",
+    desc: "Performs free corrective eye surgeries to eliminate curable blindness.",
+    impact: "Funds complete sight restoration surgery for elderly patients",
   },
   {
     name: "FreeCodeCamp Foundation",
     category: "Open Education",
-    desc: "Creates free, open-source technical education accessible worldwide.",
-    color: "#6B7485",
+    desc: "Creates accessible open-source programming education worldwide.",
+    impact: "Supports curriculum servers serving 100,000+ coders daily",
   },
 ];
 
 const PIPELINE_STEPS = [
   {
     num: "1",
-    label: "Structure",
-    desc: "AI parses your natural language goal into quantitative parameters and an evidence rule.",
-    color: "#1E4FD8",
-    bg: "rgba(30,79,216,0.12)",
+    label: "Goal",
+    desc: "Input your natural language milestone. AI structures quantified targets and verifiable evidence rules.",
+    accent: "#3D5AFE",
   },
   {
     num: "2",
     label: "Escrow",
-    desc: "Deposit your stake and pair your goal with an accredited non-profit beneficiary.",
-    color: "#0A6640",
-    bg: "rgba(10,102,64,0.12)",
+    desc: "Deposit your chosen stake into automated escrow and select a verified beneficiary charity.",
+    accent: "#FF6B35",
   },
   {
     num: "3",
     label: "Verify",
-    desc: "Commits and submissions are polled automatically; AI confirms relevance daily.",
-    color: "#1E4FD8",
-    bg: "rgba(30,79,216,0.12)",
+    desc: "GitHub commits and Codeforces submissions are polled daily. AI validates code authenticity.",
+    accent: "#00C896",
   },
   {
     num: "4",
     label: "Settle",
-    desc: "Hit your target → full refund. Miss it → stake routes to your chosen charity.",
-    color: "#C44B0A",
-    bg: "rgba(196,75,10,0.12)",
+    desc: "Achieve target → 100% principal refunded. Miss deadline → funds transfer directly to your chosen charity.",
+    accent: "#FF3D71",
   },
 ];
 
@@ -93,98 +90,60 @@ export default function Home() {
   };
 
   return (
-    <div className="w-full flex flex-col">
-      {/* ── HERO — full-bleed dark ───────────────────────────────────────── */}
-      <section
-        className="w-full px-4 pt-20 pb-24 flex flex-col items-center text-center space-y-8"
-        style={{ backgroundColor: "#0F1117" }}
-      >
-        {/* Eyebrow */}
-        <div
-          className="text-[11px] font-medium tracking-[0.18em] uppercase"
-          style={{ color: "rgba(255,255,255,0.35)", fontFamily: "var(--font-data)" }}
-        >
-          Stake · Verify · Settle
+    <div className="w-full flex flex-col bg-white">
+      <section className="w-full px-4 pt-16 pb-20 sm:pt-24 sm:pb-28 max-w-6xl mx-auto flex flex-col items-center text-center space-y-8">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-[12px] bg-[#F2F3F7] text-[#16161A] text-[14px] font-medium font-body border border-[#F2F3F7]">
+          <span className="text-[#FF6B35] font-bold">Stake</span>
+          <span className="text-[#16161A]/40">&bull;</span>
+          <span className="text-[#00C896] font-bold">Verify</span>
+          <span className="text-[#16161A]/40">&bull;</span>
+          <span className="text-[#FF3D71] font-bold">Settle</span>
         </div>
 
-        {/* Headline */}
-        <div className="space-y-3 max-w-2xl">
-          <h1
-            className="text-4xl sm:text-6xl font-bold text-white leading-[1.08] tracking-tight"
-            style={{ fontFamily: "var(--font-display, 'Space Grotesk', sans-serif)" }}
-          >
-            Put real money
-            <br />
-            behind your{" "}
-            <span style={{ color: "#0A6640" }}>code goals.</span>
+        <div className="space-y-4 max-w-3xl">
+          <h1 className="text-hero text-[#16161A]">
+            Put real money behind your code goals.
           </h1>
-          <p
-            className="text-base sm:text-lg leading-relaxed max-w-lg mx-auto"
-            style={{ color: "rgba(255,255,255,0.55)" }}
-          >
-            Lock stakes into automated escrow. Verified daily from GitHub and Codeforces activity. Miss your target? Your pledge funds a verified charity.
+          <p className="text-[20px] text-[#16161A]/80 font-body leading-relaxed max-w-2xl mx-auto">
+            Stake money into automated escrow. Verified automatically by GitHub activity and AI.
+            Hit your target for a 100% refund — or fund a verified charity.
           </p>
         </div>
 
-        {/* Goal Input */}
         <form
           onSubmit={handleStartWithGoal}
-          className="w-full max-w-xl space-y-3"
+          className="w-full max-w-xl space-y-4"
         >
-          <div
-            className="flex flex-col sm:flex-row gap-2 p-2 rounded-[12px]"
-            style={{ backgroundColor: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
-          >
+          <div className="flex flex-col sm:flex-row gap-2 p-2 rounded-[12px] bg-[#F2F3F7] border border-[#F2F3F7]">
             <div className="relative flex-1 flex items-center">
-              <Target className="absolute left-3 h-4 w-4 shrink-0" style={{ color: "rgba(255,255,255,0.35)" }} />
+              <Target className="absolute left-3.5 h-5 w-5 shrink-0 text-[#16161A]/40" />
               <input
                 id="hero-goal-input"
                 type="text"
                 value={goalText}
                 onChange={(e) => setGoalText(e.target.value)}
                 placeholder="e.g. Solve 20 DSA problems in 7 days"
-                className="w-full rounded-[8px] py-2.5 pl-9 pr-3 text-sm text-white bg-transparent placeholder:text-[rgba(255,255,255,0.3)] outline-none"
-                style={{ fontFamily: "var(--font-body, Inter, sans-serif)" }}
+                className="w-full rounded-[12px] py-3 pl-11 pr-3 text-[14px] text-[#16161A] bg-white placeholder:text-[#16161A]/40 outline-none border border-transparent focus:border-[#3D5AFE]"
               />
             </div>
-            <button
+            <Button
               type="submit"
               id="hero-structure-btn"
-              className="flex items-center justify-center gap-2 h-10 px-5 text-sm font-semibold text-white rounded-[8px] shrink-0 transition-all"
-              style={{
-                backgroundColor: "#0A6640",
-                fontFamily: "var(--font-body, Inter, sans-serif)",
-              }}
-              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#085535")}
-              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#0A6640")}
+              variant="primary"
+              size="md"
+              rightIcon={<ArrowRight className="h-4 w-4" />}
             >
               Structure Goal
-              <ArrowRight className="h-4 w-4" />
-            </button>
+            </Button>
           </div>
 
-          {/* Presets */}
           <div className="flex flex-wrap items-center justify-center gap-2">
             {SAMPLE_GOALS.map((s) => (
               <button
                 key={s}
                 type="button"
                 onClick={() => setGoalText(s)}
-                className="text-[11px] px-2.5 py-1 rounded-full transition-colors"
-                style={{
-                  backgroundColor: "rgba(255,255,255,0.06)",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  color: "rgba(255,255,255,0.55)",
-                  fontFamily: "var(--font-body, Inter, sans-serif)",
-                }}
-                onMouseOver={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.color = "white";
-                  (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.25)";
-                }}
-                onMouseOut={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.55)";
-                  (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.1)";
-                }}
+                className="text-[14px] px-3 py-1.5 rounded-[12px] bg-[#F2F3F7] text-[#16161A]/70 hover:text-[#16161A] hover:bg-[#e5e7ee] transition-colors font-body"
               >
                 {s}
               </button>
@@ -192,166 +151,122 @@ export default function Home() {
           </div>
         </form>
 
-        {/* Auth CTAs */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 pt-2">
           {isAuthenticated ? (
-            <Link
-              href="/dashboard"
-              id="hero-dashboard-link"
-              className="flex items-center gap-2 h-10 px-6 text-sm font-semibold text-white rounded-[8px] transition-all"
-              style={{ backgroundColor: "#0A6640", fontFamily: "var(--font-body)" }}
+            <Button
+              variant="primary"
+              size="lg"
+              onClick={() => router.push("/dashboard")}
+              rightIcon={<ArrowRight className="h-4 w-4" />}
             >
-              Go to Dashboard <ArrowRight className="h-4 w-4" />
-            </Link>
+              Go to Dashboard
+            </Button>
           ) : (
             <>
-              <Link
-                href="/commitments/new"
-                id="hero-create-link"
-                className="flex items-center gap-2 h-10 px-6 text-sm font-semibold text-white rounded-[8px] transition-all"
-                style={{ backgroundColor: "#0A6640", fontFamily: "var(--font-body)" }}
+              <Button
+                variant="primary"
+                size="lg"
+                onClick={() => router.push("/commitments/new")}
               >
                 Create Commitment
-              </Link>
-              <Link
-                href="/login"
-                id="hero-signin-link"
-                className="flex items-center h-10 px-5 text-sm font-medium rounded-[8px] transition-colors"
-                style={{
-                  color: "rgba(255,255,255,0.7)",
-                  border: "1px solid rgba(255,255,255,0.15)",
-                  fontFamily: "var(--font-body)",
-                }}
+              </Button>
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => router.push("/login")}
               >
                 Sign In
-              </Link>
+              </Button>
             </>
           )}
         </div>
       </section>
 
-      {/* ── HOW IT WORKS — numbered timeline ───────────────────────────── */}
-      <section
-        className="w-full px-4 py-16"
-        style={{ backgroundColor: "#F5F6F8", borderTop: "1px solid #E8EAED" }}
-      >
-        <div className="max-w-5xl mx-auto space-y-10">
-          <div className="space-y-1">
-            <h2
-              className="text-2xl font-bold text-[#111318]"
-              style={{ fontFamily: "var(--font-display, 'Space Grotesk', sans-serif)" }}
-            >
+      <section className="w-full px-4 py-20 bg-[#F2F3F7] border-t border-[#F2F3F7]">
+        <div className="max-w-6xl mx-auto space-y-12">
+          <div className="space-y-2 text-center max-w-2xl mx-auto">
+            <h2 className="text-section text-[#16161A]">
               How it works
             </h2>
-            <p className="text-sm text-[#4B5263]">
-              A closed-loop protocol combining code proof, AI analysis, and escrow settlement.
+            <p className="text-[16px] text-[#16161A]/70 font-body">
+              The closed-loop protocol combining stake deposits, continuous code proof, and automated settlement.
             </p>
           </div>
 
-          {/* Horizontal pipeline — desktop / stacked — mobile */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px rounded-[12px] overflow-hidden"
-            style={{ border: "1px solid #E8EAED" }}
-          >
-            {PIPELINE_STEPS.map((step, i) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {PIPELINE_STEPS.map((step) => (
               <div
-                key={step.label}
-                className="relative p-6 space-y-3 bg-white"
-                style={{
-                  borderRight: i < PIPELINE_STEPS.length - 1 ? "1px solid #E8EAED" : undefined,
-                }}
+                key={step.num}
+                className="p-6 space-y-4 bg-white rounded-[12px] border border-[#F2F3F7] flex flex-col justify-between"
               >
-                {/* Step number */}
-                <div
-                  className="h-9 w-9 rounded-[8px] flex items-center justify-center text-sm font-bold"
-                  style={{
-                    backgroundColor: step.bg,
-                    color: step.color,
-                    fontFamily: "var(--font-display)",
-                  }}
-                >
-                  {step.num}
-                </div>
-                <div className="space-y-1">
-                  <h3
-                    className="text-sm font-semibold text-[#111318]"
-                    style={{ fontFamily: "var(--font-display)" }}
+                <div className="space-y-4">
+                  <div
+                    className="h-10 w-10 rounded-[12px] flex items-center justify-center text-[16px] font-bold text-white font-display"
+                    style={{ backgroundColor: step.accent }}
                   >
+                    {step.num}
+                  </div>
+                  <h3 className="text-subhead text-[#16161A]">
                     {step.label}
                   </h3>
-                  <p className="text-xs text-[#4B5263] leading-relaxed">{step.desc}</p>
+                  <p className="text-[14px] text-[#16161A]/70 leading-relaxed font-body">
+                    {step.desc}
+                  </p>
                 </div>
-                {/* Connector arrow on desktop */}
-                {i < PIPELINE_STEPS.length - 1 && (
-                  <div
-                    className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 h-5 w-5 bg-white border border-[#E8EAED] rounded-full hidden lg:flex items-center justify-center z-10"
-                    style={{ color: "#B0B7C3" }}
-                  >
-                    <ArrowRight className="h-3 w-3" />
-                  </div>
-                )}
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── CHARITY CAUSES — horizontal scroll cards ─────────────────── */}
-      <section
-        className="w-full px-4 py-16"
-        style={{ backgroundColor: "#FFFFFF", borderTop: "1px solid #E8EAED" }}
-      >
-        <div className="max-w-5xl mx-auto space-y-8">
+      <section className="w-full px-4 py-20 bg-white border-t border-[#F2F3F7]">
+        <div className="max-w-6xl mx-auto space-y-12">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-            <div className="space-y-1">
-              <h2
-                className="text-2xl font-bold text-[#111318]"
-                style={{ fontFamily: "var(--font-display, 'Space Grotesk', sans-serif)" }}
-              >
-                Verified Beneficiary Causes
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-[12px] bg-[#FF3D71]/10 text-[#FF3D71] text-[14px] font-bold font-body">
+                <Heart className="h-4 w-4" />
+                <span>Verified Beneficiary Causes</span>
+              </div>
+              <h2 className="text-section text-[#16161A]">
+                Missed targets create real-world impact.
               </h2>
-              <p className="text-sm text-[#4B5263]">
-                Every commitment is backed by an accredited non-profit. You choose before staking.
+              <p className="text-[16px] text-[#16161A]/70 font-body max-w-xl">
+                Every commitment is paired with an accredited cause. If you fail to hit your milestone, your entire stake transfers directly to their vetted relief account.
               </p>
             </div>
             <Link
               href="/commitments/new"
-              id="causes-view-all"
-              className="text-xs font-medium text-[#0A6640] hover:underline underline-offset-4 shrink-0"
+              className="text-[16px] font-bold text-[#FF3D71] hover:underline inline-flex items-center gap-1 shrink-0"
             >
-              View all causes →
+              <span>Explore all partners</span>
+              <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {BENEFICIARY_CAUSES.map((cause) => (
               <div
                 key={cause.name}
-                className="flex gap-4 p-5 rounded-[10px] bg-white"
-                style={{
-                  border: "1px solid #E8EAED",
-                  borderLeft: `4px solid ${cause.color}`,
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.07)",
-                }}
+                className="p-8 rounded-[12px] bg-white border-2 border-[#FF3D71] flex flex-col justify-between space-y-6"
               >
-                <div className="space-y-1 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="text-sm font-semibold text-[#111318]"
-                      style={{ fontFamily: "var(--font-display)" }}
-                    >
-                      {cause.name}
-                    </span>
-                    <span
-                      className="text-[10px] px-1.5 py-0.5 rounded-[4px] font-medium"
-                      style={{
-                        backgroundColor: `${cause.color}18`,
-                        color: cause.color,
-                      }}
-                    >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[14px] px-3 py-1 rounded-[12px] bg-[#FF3D71] text-white font-bold font-body">
                       {cause.category}
                     </span>
+                    <Heart className="h-5 w-5 text-[#FF3D71]" />
                   </div>
-                  <p className="text-xs text-[#4B5263] leading-relaxed">{cause.desc}</p>
+                  <h3 className="text-subhead text-[#16161A]">
+                    {cause.name}
+                  </h3>
+                  <p className="text-[14px] text-[#16161A]/70 leading-relaxed font-body">
+                    {cause.desc}
+                  </p>
+                </div>
+
+                <div className="pt-4 border-t border-[#F2F3F7] flex items-center gap-2 text-[14px] font-medium text-[#16161A] font-body">
+                  <CheckCircle2 className="h-4 w-4 text-[#00C896] shrink-0" />
+                  <span>{cause.impact}</span>
                 </div>
               </div>
             ))}
@@ -359,29 +274,19 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── STATUS BAR ───────────────────────────────────────────────────── */}
-      <section
-        className="w-full px-4 py-5"
-        style={{ backgroundColor: "#0F1117", borderTop: "1px solid rgba(255,255,255,0.06)" }}
-      >
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+      <section className="w-full px-4 py-6 bg-[#16161A] text-white">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-[14px] font-body">
+          <div className="flex items-center gap-2.5">
             <span
-              className="h-2 w-2 rounded-full shrink-0"
-              style={{ backgroundColor: health?.status === "ok" ? "#0A6640" : "#C44B0A" }}
+              className="h-2.5 w-2.5 rounded-[12px] shrink-0"
+              style={{ backgroundColor: health?.status === "ok" ? "#00C896" : "#FF6B35" }}
             />
-            <span
-              className="text-xs"
-              style={{ color: "rgba(255,255,255,0.5)", fontFamily: "var(--font-data)" }}
-            >
-              {health?.status === "ok" ? "All systems operational" : "System degraded"}
+            <span className="text-white/80">
+              {health?.status === "ok" ? "Protocol status: All services operational" : "Protocol status: Degraded"}
             </span>
           </div>
-          <span
-            className="text-[11px]"
-            style={{ color: "rgba(255,255,255,0.25)", fontFamily: "var(--font-data)" }}
-          >
-            Next.js 16 + Go/Gin · PostgreSQL · Razorpay Escrow
+          <span className="text-white/50">
+            Automated verification via GitHub API &middot; Settled on Razorpay Escrow
           </span>
         </div>
       </section>

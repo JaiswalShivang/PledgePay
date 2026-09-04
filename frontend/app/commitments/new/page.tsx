@@ -11,9 +11,9 @@ import {
 } from "@/lib/api-client";
 import {
   Button,
-  Badge,
   Alert,
   Textarea,
+  Input,
 } from "@/components/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -23,6 +23,8 @@ import {
   AlertCircle,
   Search,
   ExternalLink,
+  Lock,
+  Loader2,
 } from "lucide-react";
 import { GithubIcon } from "@/components/icons";
 import { useAuth } from "@/hooks/use-auth";
@@ -53,16 +55,15 @@ export default function NewCommitmentPage() {
   const [pledgeAmountINR, setPledgeAmountINR] = useState<number>(1000);
   const [isEditingParams, setIsEditingParams] = useState(false);
 
-  // All charities query & filter
-  const { data: allCharitiesData } = useQuery({
+  const { data: allCharitiesData, isLoading: isCharitiesLoading } = useQuery({
     queryKey: ["charities"],
     queryFn: () => apiClient.charities.getAll(),
+    staleTime: 15 * 60 * 1000,
   });
   const allCharities = allCharitiesData?.charities || [];
   const [charitySearch, setCharitySearch] = useState("");
   const [charityCategoryFilter, setCharityCategoryFilter] = useState("ALL");
 
-  // Inline integration state
   const [newCfHandle, setNewCfHandle] = useState("");
   const [isConnectingCf, setIsConnectingCf] = useState(false);
   const [cfConnectError, setCfConnectError] = useState<string | null>(null);
@@ -130,8 +131,6 @@ export default function NewCommitmentPage() {
 
     try {
       const res = await apiClient.ai.analyzeCombined(text);
-
-
       setStructuredGoal(res.structured);
       setQualityAnalysis(res.quality);
       setCharitySuggestions(res.charities || []);
@@ -147,8 +146,6 @@ export default function NewCommitmentPage() {
       setIsAnalyzing(false);
     }
   };
-
-
 
   const handleCreateCommitment = async () => {
     if (!structuredGoal) {
@@ -206,694 +203,562 @@ export default function NewCommitmentPage() {
 
   return (
     <AuthGuard>
-      <div className="container mx-auto max-w-2xl px-4 py-8 space-y-6">
-        {/* Header */}
-        <div className="space-y-1 pb-3 border-b border-[#E4E7EB]">
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#18181B]">
-            Create an Escrow Commitment
-          </h1>
-          <p className="text-xs text-[#52525B]">
-            Define your developer goal, review verifiability with AI, and authorize your escrow pledge.
-          </p>
-        </div>
-
-        {/* Step Indicator */}
-        <div className="grid grid-cols-4 gap-2">
-          {[
-            { step: 1, label: "1. Goal" },
-            { step: 2, label: "2. Review" },
-            { step: 3, label: "3. Charity" },
-            { step: 4, label: "4. Escrow" },
-          ].map((item) => (
-            <div
-              key={item.step}
-              onClick={() => {
-                if (item.step === 1 || (item.step === 2 && qualityAnalysis) || (item.step === 3 && qualityAnalysis) || (item.step === 4 && selectedCharityId)) {
-                  setCurrentStep(item.step as 1 | 2 | 3 | 4);
-                }
-              }}
-              className={`cursor-pointer rounded-[6px] p-2 border text-center text-xs transition-colors ${currentStep === item.step
-                ? "bg-white border-[#047857] text-[#047857] font-semibold"
-                : currentStep > item.step
-                  ? "bg-[#F8F9FA] border-[#E4E7EB] text-[#18181B]"
-                  : "bg-white border-[#E4E7EB] text-[#9CA3AF]"
-                }`}
-            >
-              <span>{item.label}</span>
-            </div>
-          ))}
-        </div>
-
-        {errorMessage && (
-          <Alert variant="destructive" title="Error">
-            {errorMessage}
-          </Alert>
-        )}
-
-        {/* STEP 1: GOAL INPUT */}
-        {currentStep === 1 && (
-          <div className="p-5 rounded-[8px] bg-white border border-[#E4E7EB] space-y-4">
-            <div className="space-y-1">
-              <h2 className="text-sm font-semibold text-[#18181B]">What is your commitment goal?</h2>
-              <p className="text-xs text-[#52525B]">
-                State clearly what you will ship or solve, and within what timeframe.
-              </p>
-            </div>
-
-            <Textarea
-              rows={3}
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              placeholder="e.g. I want to solve 20 DSA algorithmic problems in 14 days."
-            />
-
-            <div className="space-y-1.5">
-              <span className="text-xs text-[#71717A]">Examples:</span>
-              <div className="flex flex-wrap gap-1.5">
-                {PRESET_GOALS.map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => {
-                      setInputText(preset);
-                      handleAnalyze(preset);
-                    }}
-                    className="rounded-[4px] border border-[#E4E7EB] bg-[#F8F9FA] px-2 py-0.5 text-xs text-[#52525B] hover:text-[#18181B] hover:border-[#D1D5DB] transition-colors"
-                  >
-                    {preset}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="pt-2 flex justify-end">
-              <Button
-                onClick={() => handleAnalyze()}
-                variant="primary"
-                size="md"
-                isLoading={isAnalyzing}
-                disabled={!inputText.trim()}
-              >
-                Analyze Goal with AI
-              </Button>
-            </div>
+      <div className="w-full bg-white min-h-[calc(100vh-64px)]">
+        <div className="container mx-auto max-w-2xl px-4 py-10 space-y-8">
+          <div className="space-y-2">
+            <h1 className="text-section text-[#16161A]">
+              Create an Escrow Commitment
+            </h1>
+            <p className="text-[14px] text-[#16161A]/70 font-body">
+              Define your developer goal, review verifiability with AI, and authorize your escrow pledge.
+            </p>
           </div>
-        )}
 
-        {/* STEP 2: QUALITY AUDIT */}
-        {currentStep === 2 && qualityAnalysis && structuredGoal && (
-          <div className="p-5 rounded-[8px] bg-white border border-[#E4E7EB] space-y-5">
+          <div className="grid grid-cols-4 gap-3">
+            {[
+              { step: 1, label: "1. Goal" },
+              { step: 2, label: "2. Review" },
+              { step: 3, label: "3. Charity" },
+              { step: 4, label: "4. Escrow" },
+            ].map((item) => (
+              <div
+                key={item.step}
+                onClick={() => {
+                  if (
+                    item.step === 1 ||
+                    (item.step === 2 && qualityAnalysis) ||
+                    (item.step === 3 && qualityAnalysis) ||
+                    (item.step === 4 && selectedCharityId)
+                  ) {
+                    setCurrentStep(item.step as 1 | 2 | 3 | 4);
+                  }
+                }}
+                className={`cursor-pointer rounded-[12px] p-3 text-center text-[14px] font-medium transition-colors font-body ${currentStep === item.step
+                    ? "bg-[#3D5AFE] text-white"
+                    : currentStep > item.step
+                      ? "bg-[#F2F3F7] text-[#16161A]"
+                      : "bg-white border border-[#F2F3F7] text-[#16161A]/40"
+                  }`}
+              >
+                <span>{item.label}</span>
+              </div>
+            ))}
+          </div>
 
+          {errorMessage && (
+            <Alert variant="destructive" title="Error">
+              {errorMessage}
+            </Alert>
+          )}
 
-            {/* Extracted Parameters */}
-            <div className="pt-2">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-xs font-semibold text-[#52525B] uppercase tracking-wider">
-                  Parsed Parameters
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setIsEditingParams(!isEditingParams)}
-                  className="text-xs font-medium text-[#047857] hover:underline"
-                >
-                  {isEditingParams ? "✓ Done Editing" : "Customize Parameters"}
-                </button>
+          {currentStep === 1 && (
+            <div className="p-8 rounded-[12px] bg-white border border-[#F2F3F7] space-y-6">
+              <div className="space-y-1.5">
+                <h2 className="text-subhead text-[#16161A]">What is your commitment goal?</h2>
+                <p className="text-[14px] text-[#16161A]/70 font-body">
+                  State clearly what you will ship or solve, and within what timeframe.
+                </p>
               </div>
 
-              {!isEditingParams ? (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                  <div className="p-2.5 rounded-[6px] bg-[#F8F9FA] border border-[#E4E7EB]">
-                    <div className="text-[#71717A]">Target</div>
-                    <div className="font-bold font-numeric text-[#18181B] mt-0.5">{structuredGoal.target}</div>
-                  </div>
+              <Textarea
+                rows={4}
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                placeholder="e.g. I want to solve 20 DSA algorithmic problems in 14 days."
+              />
 
-                  <div className="p-2.5 rounded-[6px] bg-[#F8F9FA] border border-[#E4E7EB]">
-                    <div className="text-[#71717A]">Unit</div>
-                    <div className="font-bold font-numeric text-[#047857] capitalize mt-0.5">{structuredGoal.unit}</div>
-                  </div>
-
-                  <div className="p-2.5 rounded-[6px] bg-[#F8F9FA] border border-[#E4E7EB]">
-                    <div className="text-[#71717A]">Duration</div>
-                    <div className="font-bold font-numeric text-[#18181B] mt-0.5">
-                      {structuredGoal.timeframe_text || `${structuredGoal.duration} ${structuredGoal.duration === 1 ? "day" : "days"}`}
-                    </div>
-                  </div>
-
-                  <div className="p-2.5 rounded-[6px] bg-[#F8F9FA] border border-[#E4E7EB]">
-                    <div className="text-[#71717A]">Evidence</div>
-                    <div className="font-medium text-[#18181B] mt-0.5 capitalize">
-                      {structuredGoal.evidence === "codeforces_submissions"
-                        ? "Codeforces Submissions"
-                        : structuredGoal.evidence === "github_activity"
-                          ? "GitHub Activity"
-                          : (structuredGoal.evidence || "GitHub Activity").replace(/_/g, " ")}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                  <div className="p-2.5 rounded-[6px] bg-[#F8F9FA] border border-[#047857] space-y-1">
-                    <label className="text-[11px] text-[#71717A] block font-medium">Target Count</label>
-                    <input
-                      type="number"
-                      min={1}
-                      value={structuredGoal.target}
-                      onChange={(e) => handleParamChange("target", Math.max(1, parseInt(e.target.value) || 1))}
-                      className="w-full rounded-[4px] border border-[#D1D5DB] px-2 py-1 text-xs font-numeric font-bold text-[#18181B] bg-white focus:outline-none focus:border-[#047857]"
-                    />
-                  </div>
-
-                  <div className="p-2.5 rounded-[6px] bg-[#F8F9FA] border border-[#047857] space-y-1">
-                    <label className="text-[11px] text-[#71717A] block font-medium">Metric Unit</label>
-                    <select
-                      value={structuredGoal.unit}
-                      onChange={(e) => handleParamChange("unit", e.target.value)}
-                      className="w-full rounded-[4px] border border-[#D1D5DB] px-2 py-1 text-xs font-medium text-[#18181B] bg-white focus:outline-none focus:border-[#047857]"
-                    >
-                      <option value="pages">Pages (Document Proof)</option>
-                      <option value="words">Words</option>
-                      <option value="problems">Problems (DSA)</option>
-                      <option value="commits">Commits</option>
-                      <option value="pull_requests">Pull Requests</option>
-                      <option value="projects">Projects</option>
-                    </select>
-                  </div>
-
-                  <div className="p-2.5 rounded-[6px] bg-[#F8F9FA] border border-[#047857] space-y-1">
-                    <label className="text-[11px] text-[#71717A] block font-medium">Duration / Timeframe</label>
-                    <select
-                      value={
-                        structuredGoal.duration_minutes === 1
-                          ? "1m"
-                          : structuredGoal.duration_minutes === 2
-                            ? "2m"
-                            : structuredGoal.duration_minutes === 5
-                              ? "5m"
-                              : structuredGoal.duration_minutes === 10
-                                ? "10m"
-                                : `${structuredGoal.duration}d`
-                      }
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === "1m") {
-                          setStructuredGoal({
-                            ...structuredGoal,
-                            duration: 1,
-                            duration_minutes: 1,
-                            timeframe_text: "1 minute",
-                          });
-                        } else if (val === "2m") {
-                          setStructuredGoal({
-                            ...structuredGoal,
-                            duration: 1,
-                            duration_minutes: 2,
-                            timeframe_text: "2 minutes",
-                          });
-                        } else if (val === "5m") {
-                          setStructuredGoal({
-                            ...structuredGoal,
-                            duration: 1,
-                            duration_minutes: 5,
-                            timeframe_text: "5 minutes",
-                          });
-                        } else if (val === "10m") {
-                          setStructuredGoal({
-                            ...structuredGoal,
-                            duration: 1,
-                            duration_minutes: 10,
-                            timeframe_text: "10 minutes",
-                          });
-                        } else {
-                          const days = parseInt(val.replace("d", ""), 10) || 1;
-                          setStructuredGoal({
-                            ...structuredGoal,
-                            duration: days,
-                            duration_minutes: undefined,
-                            timeframe_text: `${days} ${days === 1 ? "day" : "days"}`,
-                          });
-                        }
+              <div className="space-y-2">
+                <span className="text-[14px] font-medium text-[#16161A]/60 font-body">Presets:</span>
+                <div className="flex flex-wrap gap-2">
+                  {PRESET_GOALS.map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => {
+                        setInputText(preset);
+                        handleAnalyze(preset);
                       }}
-                      className="w-full rounded-[4px] border border-[#D1D5DB] px-2 py-1 text-xs font-medium text-[#18181B] bg-white focus:outline-none focus:border-[#047857]"
+                      className="rounded-[12px] bg-[#F2F3F7] px-3.5 py-1.5 text-[14px] text-[#16161A]/80 hover:text-[#16161A] hover:bg-[#e5e7ee] transition-colors font-body"
                     >
-                      <option value="1m">1 minute (Demo Sprint)</option>
-                      <option value="2m">2 minutes (Demo Sprint)</option>
-                      <option value="5m">5 minutes (Quick Sprint)</option>
-                      <option value="10m">10 minutes</option>
-                      <option value="1d">1 day</option>
-                      <option value="3d">3 days</option>
-                      <option value="7d">7 days (1 week)</option>
-                      <option value="14d">14 days (2 weeks)</option>
-                      <option value="30d">30 days (1 month)</option>
-                    </select>
-                  </div>
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-                  <div className="p-2.5 rounded-[6px] bg-[#F8F9FA] border border-[#047857] space-y-1">
-                    <label className="text-[11px] text-[#71717A] block font-medium">Evidence Source</label>
-                    <select
-                      value={structuredGoal.evidence || "github_activity"}
-                      onChange={(e) => handleParamChange("evidence", e.target.value)}
-                      className="w-full rounded-[4px] border border-[#D1D5DB] px-2 py-1 text-xs font-medium text-[#18181B] bg-white focus:outline-none focus:border-[#047857]"
-                    >
-                      <option value="github_activity">GitHub Activity</option>
-                      <option value="codeforces_submissions">Codeforces Submissions</option>
-                    </select>
+              {isAnalyzing && (
+                <div className="p-4 rounded-[12px] bg-[#3D5AFE]/5 border border-[#3D5AFE]/20 flex items-center gap-3 animate-pulse">
+                  <div className="h-9 w-9 rounded-[12px] bg-[#3D5AFE] text-white flex items-center justify-center shrink-0">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <div className="text-[14px] font-bold text-[#16161A] font-display">
+                      AI Structuring in Progress…
+                    </div>
+                    <p className="text-[14px] text-[#16161A]/70 font-body">
+                      Extracting metrics, verifiability benchmarks, and charitable matching.
+                    </p>
                   </div>
                 </div>
               )}
 
-              {structuredGoal.evidence === "codeforces_submissions" ? (
-                hasCodeforces ? (
-                  <div className="flex items-center gap-2 p-2.5 rounded-[6px] bg-[#F0FDF4] border border-[#BBF7D0] text-xs text-[#166534]">
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-[#16A34A]" />
-                    <span>
-                      Codeforces Account Linked: <strong className="font-semibold">@{user?.codeforces_username}</strong>
-                    </span>
+              <div className="pt-4 flex justify-end">
+                <Button
+                  onClick={() => handleAnalyze()}
+                  variant="primary"
+                  size="md"
+                  isLoading={isAnalyzing}
+                  disabled={!inputText.trim()}
+                  rightIcon={<ArrowRight className="h-4 w-4" />}
+                >
+                  Analyze Goal with AI
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {currentStep === 2 && qualityAnalysis && structuredGoal && (
+            <div className="p-8 rounded-[12px] bg-white border border-[#F2F3F7] space-y-6">
+              <div className="space-y-1">
+                <h2 className="text-subhead text-[#16161A]">Goal Verifiability Review</h2>
+                <p className="text-[14px] text-[#16161A]/70 font-body">
+                  AI analysis confirming quantitative targets and milestone tracking.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-[14px] font-medium text-[#16161A]/70 font-body">Parsed Parameters</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingParams(!isEditingParams)}
+                    className="text-[14px] font-medium text-[#3D5AFE] hover:underline"
+                  >
+                    {isEditingParams ? "Done Editing" : "Customize Parameters"}
+                  </button>
+                </div>
+
+                {!isEditingParams ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="p-4 rounded-[12px] bg-[#F2F3F7] space-y-1">
+                      <div className="text-[14px] text-[#16161A]/60 font-body">Target</div>
+                      <div className="text-[20px] font-bold font-display text-[#16161A]">{structuredGoal.target}</div>
+                    </div>
+                    <div className="p-4 rounded-[12px] bg-[#F2F3F7] space-y-1">
+                      <div className="text-[14px] text-[#16161A]/60 font-body">Unit</div>
+                      <div className="text-[20px] font-bold font-display text-[#00C896] capitalize">{structuredGoal.unit}</div>
+                    </div>
+                    <div className="p-4 rounded-[12px] bg-[#F2F3F7] space-y-1">
+                      <div className="text-[14px] text-[#16161A]/60 font-body">Duration</div>
+                      <div className="text-[20px] font-bold font-display text-[#16161A]">
+                        {structuredGoal.timeframe_text || `${structuredGoal.duration}d`}
+                      </div>
+                    </div>
+                    <div className="p-4 rounded-[12px] bg-[#F2F3F7] space-y-1">
+                      <div className="text-[14px] text-[#16161A]/60 font-body">Evidence</div>
+                      <div className="text-[14px] font-bold font-display text-[#16161A] capitalize truncate">
+                        {structuredGoal.evidence === "codeforces_submissions" ? "Codeforces" : "GitHub"}
+                      </div>
+                    </div>
                   </div>
                 ) : (
-                  <div className="p-3.5 rounded-[6px] bg-[#FFF7ED] border border-[#FED7AA] space-y-2.5">
-                    <div className="flex items-center gap-2 text-xs font-semibold text-[#C2410C]">
-                      <AlertCircle className="h-4 w-4 shrink-0" />
-                      <span>Codeforces Account Not Linked</span>
-                    </div>
-                    <p className="text-[11px] text-[#9A3412]">
-                      To verify problem submissions and count toward your goal, enter your Codeforces handle below:
-                    </p>
-                    <div className="flex gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="p-3.5 rounded-[12px] bg-[#F2F3F7] space-y-1">
+                      <label className="text-[14px] text-[#16161A]/70 font-medium font-body block">Target</label>
                       <input
-                        type="text"
-                        value={newCfHandle}
-                        onChange={(e) => setNewCfHandle(e.target.value)}
-                        placeholder="e.g. tourist"
-                        className="flex-1 rounded-[4px] border border-[#FED7AA] bg-white px-2.5 py-1 text-xs text-[#18181B] placeholder:text-[#9CA3AF] focus:outline-none focus:border-[#047857]"
+                        type="number"
+                        min={1}
+                        value={structuredGoal.target}
+                        onChange={(e) => handleParamChange("target", Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-full rounded-[12px] border border-[#D8DBE0] bg-white px-3 py-1.5 text-[14px] font-display font-bold text-[#16161A] focus:outline-none focus:border-[#3D5AFE]"
                       />
-                      <Button
-                        onClick={handleConnectCodeforcesInline}
-                        size="sm"
-                        variant="primary"
-                        isLoading={isConnectingCf}
-                        disabled={!newCfHandle.trim()}
-                      >
-                        Verify &amp; Link
-                      </Button>
                     </div>
-                    {cfConnectError && (
-                      <p className="text-[10px] text-[#DC2626]">{cfConnectError}</p>
-                    )}
+                    <div className="p-3.5 rounded-[12px] bg-[#F2F3F7] space-y-1">
+                      <label className="text-[14px] text-[#16161A]/70 font-medium font-body block">Unit</label>
+                      <select
+                        value={structuredGoal.unit}
+                        onChange={(e) => handleParamChange("unit", e.target.value)}
+                        className="w-full rounded-[12px] border border-[#D8DBE0] bg-white px-2 py-1.5 text-[14px] text-[#16161A] font-body focus:outline-none focus:border-[#3D5AFE]"
+                      >
+                        <option value="problems">Problems</option>
+                        <option value="commits">Commits</option>
+                        <option value="pull_requests">Pull Requests</option>
+                        <option value="projects">Projects</option>
+                      </select>
+                    </div>
+                    <div className="p-3.5 rounded-[12px] bg-[#F2F3F7] space-y-1">
+                      <label className="text-[14px] text-[#16161A]/70 font-medium font-body block">Duration</label>
+                      <select
+                        value={`${structuredGoal.duration}d`}
+                        onChange={(e) => {
+                          const days = parseInt(e.target.value.replace("d", ""), 10) || 1;
+                          handleParamChange("duration", days);
+                        }}
+                        className="w-full rounded-[12px] border border-[#D8DBE0] bg-white px-2 py-1.5 text-[14px] text-[#16161A] font-body focus:outline-none focus:border-[#3D5AFE]"
+                      >
+                        <option value="3d">3 days</option>
+                        <option value="7d">7 days</option>
+                        <option value="14d">14 days</option>
+                        <option value="30d">30 days</option>
+                      </select>
+                    </div>
+                    <div className="p-3.5 rounded-[12px] bg-[#F2F3F7] space-y-1">
+                      <label className="text-[14px] text-[#16161A]/70 font-medium font-body block">Source</label>
+                      <select
+                        value={structuredGoal.evidence || "github_activity"}
+                        onChange={(e) => handleParamChange("evidence", e.target.value)}
+                        className="w-full rounded-[12px] border border-[#D8DBE0] bg-white px-2 py-1.5 text-[14px] text-[#16161A] font-body focus:outline-none focus:border-[#3D5AFE]"
+                      >
+                        <option value="github_activity">GitHub Activity</option>
+                        <option value="codeforces_submissions">Codeforces</option>
+                      </select>
+                    </div>
                   </div>
-                )
-              ) : hasGithub ? (
-                <div className="flex items-center gap-2 p-2.5 rounded-[6px] bg-[#F0FDF4] border border-[#BBF7D0] text-xs text-[#166534]">
-                  <CheckCircle2 className="h-4 w-4 shrink-0 text-[#16A34A]" />
-                  <span>
-                    GitHub Account Linked: <strong className="font-semibold">@{user?.github_username}</strong>
-                  </span>
-                </div>
-              ) : (
-                <div className="p-3.5 rounded-[6px] bg-[#EFF6FF] border border-[#BFDBFE] space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-xs font-semibold text-[#1D4ED8]">
-                      <AlertCircle className="h-4 w-4 shrink-0" />
-                      <span>GitHub Account Not Linked</span>
+                )}
+
+                {structuredGoal.evidence === "codeforces_submissions" ? (
+                  hasCodeforces ? (
+                    <div className="flex items-center gap-2 p-3.5 rounded-[12px] bg-white border border-[#00C896] text-[14px] text-[#00C896] font-body">
+                      <CheckCircle2 className="h-5 w-5 shrink-0 text-[#00C896]" />
+                      <span>Linked Codeforces: @{user?.codeforces_username}</span>
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded-[12px] bg-white border-2 border-[#FF6B35] space-y-3">
+                      <div className="flex items-center gap-2 text-[14px] font-bold text-[#FF6B35] font-body">
+                        <AlertCircle className="h-5 w-5 shrink-0" />
+                        <span>Codeforces Account Not Linked</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          value={newCfHandle}
+                          onChange={(e) => setNewCfHandle(e.target.value)}
+                          placeholder="e.g. tourist"
+                        />
+                        <Button
+                          onClick={handleConnectCodeforcesInline}
+                          size="md"
+                          variant="stake"
+                          isLoading={isConnectingCf}
+                          disabled={!newCfHandle.trim()}
+                        >
+                          Link
+                        </Button>
+                      </div>
+                      {cfConnectError && (
+                        <p className="text-[14px] text-[#FF3D71] font-body">{cfConnectError}</p>
+                      )}
+                    </div>
+                  )
+                ) : hasGithub ? (
+                  <div className="flex items-center gap-2 p-3.5 rounded-[12px] bg-white border border-[#00C896] text-[14px] text-[#00C896] font-body">
+                    <CheckCircle2 className="h-5 w-5 shrink-0 text-[#00C896]" />
+                    <span>Linked GitHub: @{user?.github_username}</span>
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-[12px] bg-white border border-[#3D5AFE] flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-[14px] font-medium text-[#16161A] font-body">
+                      <AlertCircle className="h-5 w-5 text-[#3D5AFE] shrink-0" />
+                      <span>Connect GitHub for commit polling</span>
                     </div>
                     <Button
                       onClick={handleConnectGitHubInline}
                       size="sm"
-                      variant="secondary"
+                      variant="primary"
                       isLoading={isConnectingGh}
-                      leftIcon={<GithubIcon className="h-3.5 w-3.5" />}
+                      leftIcon={<GithubIcon className="h-4 w-4" />}
                     >
-                      Connect GitHub
+                      Connect
                     </Button>
                   </div>
-                  <p className="text-[11px] text-[#1E40AF]">
-                    Connect your GitHub account so commits and pull requests can be automatically verified.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div className="pt-3 flex justify-between items-center border-t border-[#E4E7EB]">
-              <Button
-                onClick={() => setCurrentStep(1)}
-                variant="secondary"
-                size="sm"
-                leftIcon={<ArrowLeft className="h-3.5 w-3.5" />}
-              >
-                Refine Prompt
-              </Button>
-
-              <Button
-                onClick={() => setCurrentStep(3)}
-                variant="primary"
-                size="sm"
-                rightIcon={<ArrowRight className="h-3.5 w-3.5" />}
-              >
-                Choose Fallback Cause
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 3: CHARITY SELECTION */}
-        {currentStep === 3 && (
-          <div className="p-5 rounded-[8px] bg-white border border-[#E4E7EB] space-y-5">
-            <div className="space-y-0.5 pb-3 border-b border-[#E4E7EB]">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-[#18181B]">Select Fallback Impact Cause</h2>
-                <span className="text-[11px] font-medium text-[#71717A]">
-                  {allCharities.length > 0 ? allCharities.length : charitySuggestions.length} Causes Available
-                </span>
-              </div>
-              <p className="text-xs text-[#52525B]">
-                If your verified deadline is missed, 100% of your pledge is transferred to this non-profit cause.
-              </p>
-            </div>
-
-            {/* Filter and Search */}
-            <div className="flex flex-col sm:flex-row gap-2">
-              <div className="relative flex-1">
-                <Search className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#71717A]" />
-                <input
-                  type="text"
-                  placeholder="Search cause by name, mission, or keyword..."
-                  value={charitySearch}
-                  onChange={(e) => setCharitySearch(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 text-xs rounded-[6px] border border-[#E4E7EB] bg-[#F8F9FA] text-[#18181B] focus:outline-none focus:border-[#047857] focus:bg-white"
-                />
-              </div>
-
-              <select
-                value={charityCategoryFilter}
-                onChange={(e) => setCharityCategoryFilter(e.target.value)}
-                className="px-3 py-1.5 text-xs rounded-[6px] border border-[#E4E7EB] bg-white text-[#18181B] focus:outline-none focus:border-[#047857]"
-              >
-                <option value="ALL">All Categories</option>
-                {Array.from(
-                  new Set(
-                    (allCharities.length > 0
-                      ? allCharities
-                      : charitySuggestions.map((s) => s.charity).filter(Boolean)
-                    )
-                      .map((c) => c?.category)
-                      .filter(Boolean)
-                  )
-                ).map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Charity Cards List */}
-            <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
-              {(() => {
-                const baseList =
-                  allCharities.length > 0
-                    ? allCharities
-                    : charitySuggestions.map((s) => s.charity!).filter(Boolean);
-
-                const filtered = baseList.filter((c) => {
-                  const matchCat =
-                    charityCategoryFilter === "ALL" || c.category === charityCategoryFilter;
-                  const matchSearch =
-                    !charitySearch.trim() ||
-                    c.name.toLowerCase().includes(charitySearch.toLowerCase()) ||
-                    c.description?.toLowerCase().includes(charitySearch.toLowerCase()) ||
-                    c.category?.toLowerCase().includes(charitySearch.toLowerCase());
-                  return matchCat && matchSearch;
-                });
-
-                if (filtered.length === 0) {
-                  return (
-                    <div className="text-center py-8 text-xs text-[#71717A] bg-[#F8F9FA] rounded-[6px] border border-[#E4E7EB]">
-                      No charities found matching &quot;{charitySearch}&quot;. Try a different term or category.
-                    </div>
-                  );
-                }
-
-                return filtered.map((charity) => {
-                  const isSelected = selectedCharityId === charity.id;
-                  const suggestion = charitySuggestions.find(
-                    (s) => s.charity_id === charity.id
-                  );
-
-                  return (
-                    <div
-                      key={charity.id}
-                      onClick={() => setSelectedCharityId(charity.id)}
-                      className={`cursor-pointer p-3.5 rounded-[6px] border transition-colors space-y-1.5 ${
-                        isSelected
-                          ? "bg-[#ECFDF5] border-[#047857]"
-                          : "bg-white border-[#E4E7EB] hover:border-[#D1D5DB]"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs font-semibold text-[#18181B]">{charity.name}</span>
-                          <Badge variant="default" size="sm">
-                            {charity.category || "Impact"}
-                          </Badge>
-                          {suggestion && (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-[#047857]/10 text-[#047857] border border-[#047857]/20">
-                              ★ AI Recommended
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          {charity.website_url && (
-                            <a
-                              href={charity.website_url}
-                              target="_blank"
-                              rel="noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="text-[#71717A] hover:text-[#18181B]"
-                              title="Visit website"
-                            >
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
-                          )}
-                          <div
-                            className={`h-4 w-4 rounded-full flex items-center justify-center text-[10px] ${
-                              isSelected
-                                ? "bg-[#047857] text-white"
-                                : "border border-[#D1D5DB] text-transparent"
-                            }`}
-                          >
-                            ✓
-                          </div>
-                        </div>
-                      </div>
-
-                      <p className="text-xs text-[#52525B] leading-relaxed">
-                        {charity.description}
-                      </p>
-
-                      {suggestion && (
-                        <div className="text-[11px] text-[#047857] pt-0.5 font-medium">
-                          <span>Why this matches: {suggestion.rationale}</span>
-                        </div>
-                      )}
-                    </div>
-                  );
-                });
-              })()}
-            </div>
-
-            <div className="pt-3 flex justify-between items-center border-t border-[#E4E7EB]">
-              <Button
-                onClick={() => setCurrentStep(2)}
-                variant="secondary"
-                size="sm"
-                leftIcon={<ArrowLeft className="h-3.5 w-3.5" />}
-              >
-                Back to Review
-              </Button>
-
-              <Button
-                onClick={() => setCurrentStep(4)}
-                variant="primary"
-                size="sm"
-                disabled={!selectedCharityId}
-                rightIcon={<ArrowRight className="h-3.5 w-3.5" />}
-              >
-                Configure Stake
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 4: PLEDGE & SUMMARY */}
-        {currentStep === 4 && structuredGoal && selectedCharityId && (
-          <div className="p-5 rounded-[8px] bg-white border border-[#E4E7EB] space-y-5">
-            <div className="space-y-0.5 pb-3 border-b border-[#E4E7EB]">
-              <h2 className="text-sm font-semibold text-[#18181B]">Configure Escrow Stake</h2>
-              <p className="text-xs text-[#52525B]">
-                100% refunded to your account upon verified milestone completion.
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <label className="text-xs font-medium text-[#52525B]">
-                Pledge Amount (₹ INR)
-              </label>
-
-              {/* Quick Presets */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {PLEDGE_PRESETS.map((amt) => (
-                  <button
-                    key={amt}
-                    type="button"
-                    onClick={() => setPledgeAmountINR(amt)}
-                    className={`py-2 rounded-[6px] border font-numeric font-medium text-sm transition-colors ${
-                      pledgeAmountINR === amt
-                        ? "bg-[#047857] text-white border-[#047857]"
-                        : "bg-white text-[#18181B] border-[#E4E7EB] hover:border-[#D1D5DB]"
-                    }`}
-                  >
-                    ₹{amt.toLocaleString("en-IN")}
-                  </button>
-                ))}
-              </div>
-
-              {/* Custom Input Field */}
-              <div className="space-y-1 pt-1">
-                <label htmlFor="custom-pledge-amount" className="text-[11px] font-medium text-[#71717A]">
-                  Or enter your own custom amount (₹ INR)
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-[#71717A]">
-                    ₹
-                  </span>
-                  <input
-                    id="custom-pledge-amount"
-                    type="number"
-                    min="1"
-                    max="1000000"
-                    step="1"
-                    placeholder="Enter any amount, e.g. 250, 750, 1500, 10000"
-                    value={pledgeAmountINR || ""}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value, 10);
-                      setPledgeAmountINR(isNaN(val) ? 0 : Math.max(0, val));
-                    }}
-                    className="w-full pl-8 pr-4 py-2 rounded-[6px] border border-[#E4E7EB] bg-white font-numeric font-medium text-sm text-[#18181B] focus:outline-none focus:border-[#047857] focus:ring-1 focus:ring-[#047857]"
-                  />
-                </div>
-                <p className="text-[11px] text-[#71717A]">
-                  Enter any custom stake according to your choice. 100% refunded when your goal is verified.
-                </p>
-              </div>
-            </div>
-
-            {/* Ledger Summary */}
-            <div className="p-3.5 rounded-[6px] bg-[#F8F9FA] border border-[#E4E7EB] space-y-2 text-xs">
-              <div className="flex justify-between text-[#52525B] pb-1.5 border-b border-[#E4E7EB]">
-                <span>Required Daily Pace</span>
-                <span className="font-numeric font-medium text-[#18181B]">{dailyPace} {structuredGoal.unit} / day</span>
-              </div>
-
-              <div className="flex justify-between text-[#52525B] pb-1.5 border-b border-[#E4E7EB]">
-                <span>Escrow Window</span>
-                <span className="font-numeric font-medium text-[#18181B]">{structuredGoal.timeframe_text || `${structuredGoal.duration} ${structuredGoal.duration === 1 ? "day" : "days"}`}</span>
-              </div>
-
-              <div className="flex justify-between text-[#52525B] pb-1.5 border-b border-[#E4E7EB]">
-                <span>Fallback Beneficiary</span>
-                <span className="font-medium text-[#18181B]">{selectedCharity?.name}</span>
-              </div>
-
-              <div className="flex justify-between items-center pt-1">
-                <span className="text-sm font-semibold text-[#18181B]">Total Stake</span>
-                <span className="text-xl font-bold font-numeric text-[#047857]">
-                  ₹{pledgeAmountINR.toLocaleString("en-IN")}
-                </span>
-              </div>
-            </div>
-
-            {/* Pre-creation Account Verification Warning */}
-            {!hasCodeforces && structuredGoal.evidence === "codeforces_submissions" && (
-              <div className="p-3.5 rounded-[6px] bg-[#FFF7ED] border border-[#FED7AA] space-y-2">
-                <div className="flex items-center gap-2 text-xs font-semibold text-[#C2410C]">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
-                  <span>Codeforces Handle Required Before Creating Pledge</span>
-                </div>
-                <p className="text-[11px] text-[#9A3412]">
-                  Link your Codeforces handle so our automated protocol can verify your submissions:
-                </p>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newCfHandle}
-                    onChange={(e) => setNewCfHandle(e.target.value)}
-                    placeholder="e.g. tourist"
-                    className="flex-1 rounded-[4px] border border-[#FED7AA] bg-white px-2.5 py-1 text-xs text-[#18181B] placeholder:text-[#9CA3AF] focus:outline-none focus:border-[#047857]"
-                  />
-                  <Button
-                    onClick={handleConnectCodeforcesInline}
-                    size="sm"
-                    variant="primary"
-                    isLoading={isConnectingCf}
-                    disabled={!newCfHandle.trim()}
-                  >
-                    Link Handle
-                  </Button>
-                </div>
-                {cfConnectError && (
-                  <p className="text-[10px] text-[#DC2626]">{cfConnectError}</p>
                 )}
               </div>
-            )}
 
-            {!hasGithub && structuredGoal.evidence === "github_activity" && (
-              <div className="p-3.5 rounded-[6px] bg-[#EFF6FF] border border-[#BFDBFE] space-y-2">
+              <div className="pt-4 flex justify-between items-center border-t border-[#F2F3F7]">
+                <Button
+                  onClick={() => setCurrentStep(1)}
+                  variant="secondary"
+                  size="sm"
+                  leftIcon={<ArrowLeft className="h-4 w-4" />}
+                >
+                  Refine Prompt
+                </Button>
+                <Button
+                  onClick={() => setCurrentStep(3)}
+                  variant="primary"
+                  size="md"
+                  rightIcon={<ArrowRight className="h-4 w-4" />}
+                >
+                  Choose Fallback Cause
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {currentStep === 3 && (
+            <div className="p-8 rounded-[12px] bg-white border border-[#F2F3F7] space-y-6">
+              <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-[#1D4ED8]">
-                    <AlertCircle className="h-4 w-4 shrink-0" />
-                    <span>GitHub Account Required</span>
-                  </div>
-                  <Button
-                    onClick={handleConnectGitHubInline}
-                    size="sm"
-                    variant="secondary"
-                    isLoading={isConnectingGh}
-                    leftIcon={<GithubIcon className="h-3.5 w-3.5" />}
-                  >
-                    Connect GitHub
-                  </Button>
+                  <h2 className="text-subhead text-[#16161A]">Select Fallback Impact Cause</h2>
+                  <span className="text-[14px] text-[#FF3D71] font-medium font-body">
+                    {allCharities.length > 0 ? allCharities.length : charitySuggestions.length} Causes Available
+                  </span>
                 </div>
-                <p className="text-[11px] text-[#1E40AF]">
-                  Please connect your GitHub account so commits and PRs can be automatically verified.
+                <p className="text-[14px] text-[#16161A]/70 font-body">
+                  If your verified deadline is missed, 100% of your pledge is transferred to this accredited non-profit.
                 </p>
               </div>
-            )}
 
-            <div className="pt-3 flex justify-between items-center border-t border-[#E4E7EB]">
-              <Button
-                onClick={() => setCurrentStep(3)}
-                variant="secondary"
-                size="sm"
-                leftIcon={<ArrowLeft className="h-3.5 w-3.5" />}
-              >
-                Change Cause
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Search className="h-4 w-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#16161A]/40" />
+                  <input
+                    type="text"
+                    placeholder="Search causes..."
+                    value={charitySearch}
+                    onChange={(e) => setCharitySearch(e.target.value)}
+                    className="w-full pl-10 pr-3.5 py-2.5 text-[14px] rounded-[12px] border border-[#D8DBE0] bg-white text-[#16161A] focus:outline-none focus:border-[#3D5AFE] font-body"
+                  />
+                </div>
+                <select
+                  value={charityCategoryFilter}
+                  onChange={(e) => setCharityCategoryFilter(e.target.value)}
+                  className="px-3.5 py-2.5 text-[14px] rounded-[12px] border border-[#D8DBE0] bg-white text-[#16161A] font-body focus:outline-none focus:border-[#3D5AFE]"
+                >
+                  <option value="ALL">All Categories</option>
+                  {Array.from(
+                    new Set(
+                      (allCharities.length > 0
+                        ? allCharities
+                        : charitySuggestions.map((s) => s.charity).filter(Boolean)
+                      )
+                        .map((c) => c?.category)
+                        .filter(Boolean)
+                    )
+                  ).map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-              <Button
-                onClick={handleCreateCommitment}
-                variant="primary"
-                size="md"
-                isLoading={isCreating}
-                disabled={
-                  (!hasCodeforces && structuredGoal.evidence === "codeforces_submissions") ||
-                  (!hasGithub && structuredGoal.evidence === "github_activity")
-                }
-              >
-                Authorize Escrow &amp; Create Commitment
-              </Button>
+              <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                {(() => {
+                  const baseList =
+                    allCharities.length > 0
+                      ? allCharities
+                      : charitySuggestions.map((s) => s.charity!).filter(Boolean);
+
+                  const filtered = baseList.filter((c) => {
+                    const matchCat =
+                      charityCategoryFilter === "ALL" || c.category === charityCategoryFilter;
+                    const matchSearch =
+                      !charitySearch.trim() ||
+                      c.name.toLowerCase().includes(charitySearch.toLowerCase()) ||
+                      c.description?.toLowerCase().includes(charitySearch.toLowerCase()) ||
+                      c.category?.toLowerCase().includes(charitySearch.toLowerCase());
+                    return matchCat && matchSearch;
+                  });
+
+                  if (isCharitiesLoading && filtered.length === 0) {
+                    return (
+                      <div className="space-y-3">
+                        {[1, 2, 3].map((n) => (
+                          <div key={n} className="p-5 rounded-[12px] bg-[#F2F3F7] animate-pulse h-24" />
+                        ))}
+                      </div>
+                    );
+                  }
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="text-center py-10 text-[14px] text-[#16161A]/50 bg-[#F2F3F7] rounded-[12px]">
+                        No causes found matching your filter.
+                      </div>
+                    );
+                  }
+
+                  return filtered.map((charity) => {
+                    const isSelected = selectedCharityId === charity.id;
+                    const suggestion = charitySuggestions.find(
+                      (s) => s.charity_id === charity.id
+                    );
+
+                    return (
+                      <div
+                        key={charity.id}
+                        onClick={() => setSelectedCharityId(charity.id)}
+                        className={`cursor-pointer p-5 rounded-[12px] border-2 transition-colors space-y-2 ${isSelected
+                            ? "bg-white border-[#FF3D71]"
+                            : "bg-white border-[#F2F3F7] hover:border-[#FF3D71]/40"
+                          }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2.5">
+                            <span className="text-[16px] font-bold text-[#16161A] font-display">{charity.name}</span>
+                            <span className="text-[14px] px-2.5 py-0.5 rounded-[12px] bg-[#FF3D71] text-white font-medium font-body">
+                              {charity.category || "Impact"}
+                            </span>
+                            {suggestion && (
+                              <span className="text-[14px] px-2.5 py-0.5 rounded-[12px] bg-[#F2F3F7] text-[#16161A] font-medium font-body">
+                                Recommended
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {charity.website_url && (
+                              <a
+                                href={charity.website_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-[#16161A]/50 hover:text-[#16161A]"
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                              </a>
+                            )}
+                            <div
+                              className={`h-5 w-5 rounded-[12px] flex items-center justify-center text-[12px] ${isSelected
+                                  ? "bg-[#FF3D71] text-white"
+                                  : "border border-[#D8DBE0] text-transparent"
+                                }`}
+                            >
+                              ✓
+                            </div>
+                          </div>
+                        </div>
+
+                        <p className="text-[14px] text-[#16161A]/70 leading-relaxed font-body">
+                          {charity.description}
+                        </p>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+
+              <div className="pt-4 flex justify-between items-center border-t border-[#F2F3F7]">
+                <Button
+                  onClick={() => setCurrentStep(2)}
+                  variant="secondary"
+                  size="sm"
+                  leftIcon={<ArrowLeft className="h-4 w-4" />}
+                >
+                  Back to Review
+                </Button>
+                <Button
+                  onClick={() => setCurrentStep(4)}
+                  variant="primary"
+                  size="md"
+                  disabled={!selectedCharityId}
+                  rightIcon={<ArrowRight className="h-4 w-4" />}
+                >
+                  Configure Stake
+                </Button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+
+          {currentStep === 4 && structuredGoal && selectedCharityId && (
+            <div className="p-8 rounded-[12px] bg-white border border-[#F2F3F7] space-y-6">
+              <div className="space-y-1.5">
+                <h2 className="text-subhead text-[#16161A]">Configure Escrow Stake</h2>
+                <p className="text-[14px] text-[#16161A]/70 font-body">
+                  100% refunded to your original payment method upon verified completion.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <label className="text-[14px] font-medium text-[#16161A] font-body">
+                  Pledge Amount (₹ INR)
+                </label>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {PLEDGE_PRESETS.map((amt) => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => setPledgeAmountINR(amt)}
+                      className={`py-3 rounded-[12px] font-display font-bold text-[20px] transition-colors border ${pledgeAmountINR === amt
+                          ? "bg-[#FF6B35] text-white border-[#FF6B35]"
+                          : "bg-white text-[#16161A] border-[#F2F3F7] hover:border-[#FF6B35]"
+                        }`}
+                    >
+                      ₹{amt.toLocaleString("en-IN")}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="space-y-2 pt-2">
+                  <label htmlFor="custom-pledge-amount" className="text-[14px] font-medium text-[#16161A]/70 font-body">
+                    Or enter a custom stake amount (₹ INR)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[16px] font-bold font-display text-[#16161A]">
+                      ₹
+                    </span>
+                    <input
+                      id="custom-pledge-amount"
+                      type="number"
+                      min="1"
+                      value={pledgeAmountINR || ""}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        setPledgeAmountINR(isNaN(val) ? 0 : Math.max(0, val));
+                      }}
+                      className="w-full pl-8 pr-4 py-2.5 rounded-[12px] border border-[#D8DBE0] bg-white font-display font-bold text-[20px] text-[#FF6B35] focus:outline-none focus:border-[#FF6B35]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 rounded-[12px] bg-[#F2F3F7] space-y-3 text-[14px] font-body">
+                <div className="flex justify-between text-[#16161A]/70 pb-2 border-b border-black/10">
+                  <span>Required Daily Pace</span>
+                  <span className="font-display font-bold text-[#16161A]">{dailyPace} {structuredGoal.unit} / day</span>
+                </div>
+                <div className="flex justify-between text-[#16161A]/70 pb-2 border-b border-black/10">
+                  <span>Escrow Window</span>
+                  <span className="font-display font-bold text-[#16161A]">{structuredGoal.timeframe_text || `${structuredGoal.duration}d`}</span>
+                </div>
+                <div className="flex justify-between text-[#16161A]/70 pb-2 border-b border-black/10">
+                  <span>Fallback Beneficiary</span>
+                  <span className="font-bold text-[#FF3D71]">{selectedCharity?.name}</span>
+                </div>
+                <div className="flex justify-between items-center pt-2">
+                  <span className="text-[16px] font-bold text-[#16161A] font-display">Total Stake</span>
+                  <span className="text-[32px] font-bold font-display text-[#FF6B35]">
+                    ₹{pledgeAmountINR.toLocaleString("en-IN")}
+                  </span>
+                </div>
+              </div>
+
+              <div className="pt-4 flex justify-between items-center border-t border-[#F2F3F7]">
+                <Button
+                  onClick={() => setCurrentStep(3)}
+                  variant="secondary"
+                  size="sm"
+                  leftIcon={<ArrowLeft className="h-4 w-4" />}
+                >
+                  Change Cause
+                </Button>
+                <Button
+                  onClick={handleCreateCommitment}
+                  variant="stake"
+                  size="lg"
+                  isLoading={isCreating}
+                  disabled={
+                    (!hasCodeforces && structuredGoal.evidence === "codeforces_submissions") ||
+                    (!hasGithub && structuredGoal.evidence === "github_activity")
+                  }
+                  rightIcon={<Lock className="h-4 w-4" />}
+                >
+                  Authorize Escrow &amp; Create Commitment
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </AuthGuard>
   );

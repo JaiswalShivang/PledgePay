@@ -5,7 +5,6 @@ import { useCurrentTimestampMs } from "@/hooks/use-clock";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { AuthGuard } from "@/components/auth-guard";
-import { DemoControls } from "@/components/demo-controls";
 import {
   apiClient,
   Commitment,
@@ -32,6 +31,7 @@ import {
   ProgressVerificationPanel,
   EvidenceFeed,
   CharityCard,
+  CoachChat,
 } from "@/components/commitment-detail";
 
 interface RazorpayPaymentFailedResponse {
@@ -109,8 +109,6 @@ export default function CommitmentDetailPage({ params }: PageProps) {
   const hasTriggeredResolutionRef = useRef(false);
   const hasAutoSyncedRef = useRef(false);
 
-
-
   const {
     data: commitment,
     isLoading,
@@ -183,7 +181,7 @@ export default function CommitmentDetailPage({ params }: PageProps) {
       refetchEvidence();
       refetchProgress();
       refetchStatus();
-    }).catch(() => { /* silent */ });
+    }).catch(() => {});
   }, [commitment, commitmentId, refetchEvidence, refetchProgress, refetchStatus]);
 
   useEffect(() => {
@@ -201,7 +199,6 @@ export default function CommitmentDetailPage({ params }: PageProps) {
           refetchStatus();
           refetchEvidence();
         } catch {
-          // silent
         } finally {
           setIsResolving(false);
         }
@@ -288,8 +285,6 @@ export default function CommitmentDetailPage({ params }: PageProps) {
     }
   };
 
-
-
   const handlePledgePayment = async () => {
     if (!commitment) return;
 
@@ -344,7 +339,7 @@ export default function CommitmentDetailPage({ params }: PageProps) {
             }
           },
           theme: {
-            color: "#047857",
+            color: "#3D5AFE",
           },
           modal: {
             ondismiss: function () {
@@ -364,7 +359,6 @@ export default function CommitmentDetailPage({ params }: PageProps) {
         });
         rzp.open();
       } else {
-        // Fallback if Razorpay credentials are mock/offline
         setPaymentStep("verifying");
         const mockPayID = orderData.mock_payment_id || `pay_mock_${Date.now()}`;
         const mockSig = orderData.mock_signature || `sig_mock_${Date.now()}`;
@@ -403,172 +397,192 @@ export default function CommitmentDetailPage({ params }: PageProps) {
 
   return (
     <AuthGuard>
-      <div className="container mx-auto max-w-5xl px-4 py-8 space-y-6">
-        {/* Navigation Breadcrumb */}
-        <div>
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center gap-1 text-xs text-[#52525B] hover:text-[#18181B] transition-colors"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            <span>Back to Dashboard</span>
-          </Link>
-        </div>
-
-        {isLoading ? (
-          <div className="h-64 rounded-[8px] bg-white border border-[#E4E7EB] animate-pulse flex items-center justify-center text-xs text-[#71717A]">
-            Loading commitment ledger...
+      <div className="w-full bg-white min-h-[calc(100vh-64px)]">
+        <div className="container mx-auto max-w-5xl px-4 py-10 space-y-8">
+          <div>
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center gap-1.5 text-[14px] text-[#16161A]/60 hover:text-[#16161A] transition-colors font-body"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>Back to Dashboard</span>
+            </Link>
           </div>
-        ) : isError || !commitment ? (
-          <Alert variant="destructive" title="Commitment Not Found">
-            {(error as Error)?.message || "You do not have access to view this commitment."}
-          </Alert>
-        ) : (
-          <div className="space-y-6">
-            {errorMessage && (
-              <Alert variant="destructive" title="Operation Error">
-                {errorMessage}
-              </Alert>
-            )}
 
-            {syncSuccessMsg && (
-              <Alert variant="success">
-                {syncSuccessMsg}
-              </Alert>
-            )}
+          {isLoading ? (
+            <div className="space-y-8 animate-pulse">
+              <div className="space-y-2">
+                <div className="h-6 w-32 bg-[#F2F3F7] rounded-[12px]" />
+                <div className="h-10 w-96 bg-[#F2F3F7] rounded-[12px]" />
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 space-y-6">
+                  <div className="h-56 rounded-[12px] bg-[#F2F3F7]" />
+                  <div className="h-72 rounded-[12px] bg-[#F2F3F7]" />
+                </div>
+                <div className="space-y-6">
+                  <div className="h-64 rounded-[12px] bg-[#F2F3F7]" />
+                  <div className="h-48 rounded-[12px] bg-[#F2F3F7]" />
+                </div>
+              </div>
+            </div>
+          ) : isError || !commitment ? (
+            <Alert variant="destructive" title="Commitment Not Found">
+              {(error as Error)?.message || "You do not have access to view this commitment."}
+            </Alert>
+          ) : (
+            <div className="space-y-8">
+              {errorMessage && (
+                <Alert variant="destructive" title="Operation Error">
+                  {errorMessage}
+                </Alert>
+              )}
 
-            {/* Resolution Banner */}
-            {isResolved && (
-              <ResolutionBanner commitment={commitment} statusData={statusData} />
-            )}
+              {syncSuccessMsg && (
+                <Alert variant="success">
+                  {syncSuccessMsg}
+                </Alert>
+              )}
 
-            {/* Active Escrow Custody Banner */}
-            {commitment.status === "ACTIVE" && (
-              <div className="p-4 rounded-[8px] bg-[#ECFDF5] border border-[#A7F3D0] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5">
-                  <ShieldCheck className="h-5 w-5 text-[#047857] shrink-0" />
-                  <div>
-                    <div className="text-xs font-semibold text-[#065F46]">
-                      Escrow Locked & Polling Active
+              {isResolved && (
+                <ResolutionBanner commitment={commitment} statusData={statusData} />
+              )}
+
+              {commitment.status === "ACTIVE" && (
+                <div className="p-6 rounded-[12px] bg-white border-2 border-[#00C896] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <ShieldCheck className="h-6 w-6 text-[#00C896] shrink-0" />
+                    <div>
+                      <div className="text-[16px] font-bold text-[#16161A] font-display">
+                        Escrow Locked &amp; Automated Polling Active
+                      </div>
+                      <p className="text-[14px] text-[#16161A]/70 font-body">
+                        ₹{amountINR.toLocaleString("en-IN")} stake is secured in custody. 100% refunded upon completion.
+                      </p>
                     </div>
-                    <p className="text-xs text-[#047857]">
-                      ₹{amountINR.toLocaleString("en-IN")} stake is secured in smart escrow.
-                    </p>
                   </div>
+
+                  <Button
+                    onClick={handleCheckResolution}
+                    variant="outline"
+                    size="sm"
+                    isLoading={isResolving}
+                    leftIcon={<Award className="h-4 w-4 text-[#00C896]" />}
+                  >
+                    Check Resolution
+                  </Button>
+                </div>
+              )}
+
+              {verificationData?.anomaly_flag && (
+                <AnomalyBanner reason={verificationData.anomaly_reason} />
+              )}
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#F2F3F7]">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Badge variant={commitment.status === "ACTIVE" ? "active" : "neutral"} size="sm">
+                      {commitment.status}
+                    </Badge>
+                    {commitment.quality_score && (
+                      <Badge variant="verified" size="sm">
+                        Quality: {commitment.quality_score}/100
+                      </Badge>
+                    )}
+                  </div>
+                  <h1 className="text-section text-[#16161A]">
+                    {commitment.title}
+                  </h1>
                 </div>
 
-                <Button
-                  onClick={handleCheckResolution}
-                  variant="secondary"
-                  size="sm"
-                  isLoading={isResolving}
-                  leftIcon={<Award className="h-3.5 w-3.5 text-[#047857]" />}
-                >
-                  Check Resolution
-                </Button>
+                <div className="sm:text-right shrink-0">
+                  <div className="text-[14px] text-[#16161A]/60 font-body">Escrow Stake</div>
+                  <div className="text-[32px] font-bold font-display text-[#FF6B35]">
+                    ₹{amountINR.toLocaleString("en-IN")}
+                  </div>
+                </div>
               </div>
-            )}
 
-            {/* Anomaly Detection Banner */}
-            {verificationData?.anomaly_flag && (
-              <AnomalyBanner reason={verificationData.anomaly_reason} />
-            )}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 space-y-8">
+                  {commitment.status === "ACTIVE" && (
+                    progressData ? (
+                      <ProgressVerificationPanel
+                        commitment={commitment}
+                        progressData={progressData}
+                        verificationData={verificationData}
+                        isVerifyingAI={isVerifyingAI}
+                        onVerifyAI={handleVerifyAI}
+                      />
+                    ) : (
+                      <div className="rounded-[12px] bg-white border border-[#F2F3F7] p-6 space-y-4 animate-pulse">
+                        <div className="h-6 w-48 bg-[#F2F3F7] rounded-[12px]" />
+                        <div className="h-10 w-full bg-[#F2F3F7] rounded-[12px]" />
+                        <div className="h-4 w-32 bg-[#F2F3F7] rounded-[12px]" />
+                      </div>
+                    )
+                  )}
 
-            {/* Title & Stake Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#E4E7EB]">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <Badge variant={commitment.status === "ACTIVE" ? "active" : "default"} size="sm">
-                    {commitment.status}
-                  </Badge>
-                  {commitment.quality_score && (
-                    <Badge variant="active" size="sm">
-                      Quality: {commitment.quality_score}/100
-                    </Badge>
+                  {commitment.status === "ACTIVE" && (
+                    <EvidenceFeed
+                      commitment={commitment}
+                      evidenceData={evidenceData}
+                      userRepos={userRepos}
+                      activeRepo={activeRepo}
+                      isLinkingRepo={isLinkingRepo}
+                      isSyncing={isSyncing}
+                      onRepoChange={setSelectedRepo}
+                      onLinkRepo={handleLinkRepo}
+                      onSyncNow={handleSyncNow}
+                    />
+                  )}
+
+                  {commitment.status !== "ACTIVE" && commitment.status !== "COMPLETED" && commitment.status !== "FAILED" && (
+                    <EscrowPaymentCard
+                      commitment={commitment}
+                      paymentStep={paymentStep}
+                      onPledgePayment={handlePledgePayment}
+                    />
                   )}
                 </div>
-                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#18181B]">
-                  {commitment.title}
-                </h1>
-              </div>
 
-              <div className="text-right shrink-0">
-                <div className="text-xs text-[#71717A]">Escrow Stake</div>
-                <div className="text-xl font-bold font-numeric text-[#18181B]">
-                  ₹{amountINR.toLocaleString("en-IN")}
-                </div>
-              </div>
-            </div>
+                <div className="space-y-6">
+                  {commitment.status === "ACTIVE" && (
+                    <CoachChat
+                      commitmentId={commitmentId}
+                      onProgressUpdated={() => {
+                        refetchProgress();
+                        refetch();
+                      }}
+                    />
+                  )}
 
-            {/* Two-Column Split Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Left Column: Progress & Evidence */}
-              <div className="lg:col-span-2 space-y-6">
-                {commitment.status === "ACTIVE" && progressData && (
-                  <ProgressVerificationPanel
-                    commitment={commitment}
-                    progressData={progressData}
-                    verificationData={verificationData}
-                    isVerifyingAI={isVerifyingAI}
-                    onVerifyAI={handleVerifyAI}
-                  />
-                )}
+                  {commitment.charity && (
+                    <CharityCard charity={commitment.charity} />
+                  )}
 
-                {commitment.status === "ACTIVE" && (
-                  <EvidenceFeed
-                    commitment={commitment}
-                    evidenceData={evidenceData}
-                    userRepos={userRepos}
-                    activeRepo={activeRepo}
-                    isLinkingRepo={isLinkingRepo}
-                    isSyncing={isSyncing}
-                    onRepoChange={setSelectedRepo}
-                    onLinkRepo={handleLinkRepo}
-                    onSyncNow={handleSyncNow}
-                  />
-                )}
-
-                {commitment.status !== "ACTIVE" && commitment.status !== "COMPLETED" && commitment.status !== "FAILED" && (
-                  <EscrowPaymentCard
-                    commitment={commitment}
-                    paymentStep={paymentStep}
-                    onPledgePayment={handlePledgePayment}
-                  />
-                )}
-              </div>
-
-              {/* Right Column: AI Coach Chat & Cause */}
-              <div className="space-y-6">
-
-
-                {commitment.charity && (
-                  <CharityCard charity={commitment.charity} />
-                )}
-
-                {/* Target Parameters */}
-                <div className="p-4 rounded-[8px] bg-white border border-[#E4E7EB] space-y-2 text-xs">
-                  <div className="font-semibold text-[#18181B] pb-1 border-b border-[#E4E7EB]">
-                    Target Specifications
-                  </div>
-                  <div className="flex justify-between text-[#52525B]">
-                    <span>Target Metric</span>
-                    <span className="font-numeric font-medium text-[#18181B]">{commitment.target_count} {commitment.unit}</span>
-                  </div>
-                  <div className="flex justify-between text-[#52525B]">
-                    <span>Duration</span>
-                    <span className="font-numeric font-medium text-[#18181B]">{commitment.duration_days} days</span>
-                  </div>
-                  <div className="flex justify-between text-[#52525B]">
-                    <span>Evidence Source</span>
-                    <span className="capitalize text-[#18181B]">{commitment.evidence_type.replace("_", " ")}</span>
+                  <div className="p-6 rounded-[12px] bg-white border border-[#F2F3F7] space-y-3 text-[14px] font-body">
+                    <div className="font-bold text-[#16161A] pb-2 border-b border-[#F2F3F7] font-display">
+                      Target Specifications
+                    </div>
+                    <div className="flex justify-between text-[#16161A]/70">
+                      <span>Target Metric</span>
+                      <span className="font-bold font-display text-[#16161A]">{commitment.target_count} {commitment.unit}</span>
+                    </div>
+                    <div className="flex justify-between text-[#16161A]/70">
+                      <span>Duration</span>
+                      <span className="font-bold font-display text-[#16161A]">{commitment.duration_days} days</span>
+                    </div>
+                    <div className="flex justify-between text-[#16161A]/70">
+                      <span>Evidence Source</span>
+                      <span className="capitalize text-[#16161A]">{commitment.evidence_type.replace("_", " ")}</span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
-
-        <DemoControls commitmentId={commitmentId} />
+          )}
+        </div>
       </div>
     </AuthGuard>
   );
