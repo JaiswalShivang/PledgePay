@@ -22,6 +22,8 @@ export interface User {
   email: string;
   name: string;
   github_username?: string;
+  codeforces_username?: string;
+  role?: string;
   created_at: string;
   integrations?: UserIntegration[];
 }
@@ -36,6 +38,7 @@ export interface RegisterInput {
   password: string;
   name: string;
   github_username?: string;
+  codeforces_username?: string;
 }
 
 export interface LoginInput {
@@ -60,6 +63,8 @@ export interface StructuredGoal {
   duration: number;
   unit: string;
   evidence: string;
+  timeframe_text?: string;
+  duration_minutes?: number;
 }
 
 export interface QualityAnalysis {
@@ -107,10 +112,16 @@ export interface EvidenceItem {
     title?: string;
     state?: string;
     merged?: boolean;
+    name?: string;
+    handle?: string;
+    problem_name?: string;
+    verdict?: string;
+    [key: string]: unknown;
   };
   occurred_at: string;
   ingested_at: string;
 }
+
 
 export type PaceStatus = "ON_TRACK" | "AT_RISK" | "BEHIND";
 
@@ -169,6 +180,7 @@ export interface Commitment {
   user_id: string;
   charity_id?: string;
   github_repo?: string;
+  codeforces_username?: string;
   title: string;
   description?: string;
   target_count: number;
@@ -214,6 +226,7 @@ export interface CreateCommitmentInput {
   target_count: number;
   unit: string;
   duration_days: number;
+  duration_minutes?: number;
   evidence_type?: string;
   amount_paise: number;
   quality_score?: number;
@@ -424,6 +437,10 @@ export const apiClient = {
       request<{ charities: Charity[] }>("/api/v1/charities", {
         method: "GET",
       }),
+    getAll: () =>
+      request<{ charities: Charity[] }>("/api/v1/charities", {
+        method: "GET",
+      }),
   },
 
   commitments: {
@@ -511,6 +528,7 @@ export const apiClient = {
           body: JSON.stringify({ question }),
         }
       ),
+
   },
 
   dev: {
@@ -584,5 +602,116 @@ export const apiClient = {
       request<{ repos: GitHubRepoItem[] }>("/api/v1/integrations/github/repos", {
         method: "GET",
       }),
+
+    connectCodeforces: (handle: string) =>
+      request<{ status: string; provider: string; handle: string }>(
+        "/api/v1/integrations/codeforces/connect",
+        {
+          method: "POST",
+          body: JSON.stringify({ handle }),
+        }
+      ),
+  },
+
+  admin: {
+    getStats: () => request<AdminStats>("/api/v1/admin/stats"),
+    getTransactions: () =>
+      request<{ transactions: AdminTransaction[]; count: number }>("/api/v1/admin/transactions"),
+    releasePayout: (commitment_id: string, action: "donate" | "refund" | "auto" = "auto") =>
+      request<AdminPayoutResult>("/api/v1/admin/payout", {
+        method: "POST",
+        body: JSON.stringify({ commitment_id, action }),
+      }),
+    createCharity: (data: {
+      name: string;
+      category: string;
+      description: string;
+      website_url?: string;
+      logo_url?: string;
+    }) =>
+      request<{ message: string; charity: Charity }>("/api/v1/admin/charities", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    deleteCharity: (id: string) =>
+      request<{ status: string; message: string; detail?: string }>(`/api/v1/admin/charities/${id}`, {
+        method: "DELETE",
+      }),
+    listCharities: () =>
+      request<{ charities: Charity[] }>("/api/v1/admin/charities"),
   },
 };
+
+export interface AdminCharityStat {
+  charity_id: string;
+  name: string;
+  category: string;
+  website_url?: string;
+  logo_url?: string;
+  total_received_paise: number;
+  pending_disbursal_paise: number;
+  total_pledges_count: number;
+  disbursed_pledges_count: number;
+}
+
+export interface AdminStats {
+  total_escrow_paise: number;
+  active_escrow_paise: number;
+  donated_paise: number;
+  refunded_paise: number;
+  total_commitments: number;
+  active_count: number;
+  completed_count: number;
+  failed_count: number;
+  draft_count: number;
+  charity_breakdown?: AdminCharityStat[];
+}
+
+export interface AdminTransaction {
+  id: string;
+  title: string;
+  amount_paise: number;
+  status: string;
+  target_count: number;
+  unit: string;
+  duration_days: number;
+  evidence_type: string;
+  start_date?: string;
+  end_date?: string;
+  created_at: string;
+  user?: {
+    id: string;
+    email: string;
+    name: string;
+    role?: string;
+  };
+  charity?: {
+    id: string;
+    name: string;
+    logo_url?: string;
+    category?: string;
+    razorpayx_fund_account_id?: string;
+  };
+  payment?: {
+    id: string;
+    razorpay_payment_id?: string;
+    status: string;
+    amount_paise: number;
+  };
+  donation?: {
+    id: string;
+    razorpayx_payout_id?: string;
+    status: string;
+    outcome: string;
+  };
+}
+
+export interface AdminPayoutResult {
+  status: string;
+  action: string;
+  commitment_id: string;
+  charity_name?: string;
+  amount_paise: number;
+  payout_id?: string;
+  message: string;
+}

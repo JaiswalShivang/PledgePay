@@ -94,13 +94,6 @@ export function DemoControls({ commitmentId }: { commitmentId?: string }) {
           onClick={() => setIsOpen(!isOpen)}
           className="flex items-center justify-between px-3.5 py-2 cursor-pointer bg-[#F8F9FA] hover:bg-[#F1F3F5] transition-colors"
         >
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-[#18181B]">
-            <Sliders className="h-3.5 w-3.5 text-[#047857]" />
-            <span>Judge Demo Controls</span>
-          </div>
-          <button className="text-[#71717A]">
-            {isOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
-          </button>
         </div>
 
         {statusMsg && (

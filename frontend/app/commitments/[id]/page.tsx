@@ -1,6 +1,7 @@
 "use client";
 
-import { use, useState, useEffect, useRef } from "react";
+import { use, useState, useRef, useEffect } from "react";
+import { useCurrentTimestampMs } from "@/hooks/use-clock";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { AuthGuard } from "@/components/auth-guard";
@@ -29,11 +30,19 @@ import {
   ResolutionBanner,
   EscrowPaymentCard,
   ProgressVerificationPanel,
-  CoachChatPanel,
   EvidenceFeed,
   CharityCard,
-  CoachMessage,
 } from "@/components/commitment-detail";
+
+interface RazorpayPaymentFailedResponse {
+  error?: {
+    code?: string;
+    description?: string;
+    source?: string;
+    step?: string;
+    reason?: string;
+  };
+}
 
 interface RazorpayOptions {
   key: string;
@@ -47,16 +56,27 @@ interface RazorpayOptions {
     razorpay_order_id: string;
     razorpay_signature: string;
   }) => void;
+  prefill?: {
+    name?: string;
+    email?: string;
+    contact?: string;
+  };
+  retry?: {
+    enabled?: boolean;
+    max_count?: number;
+  };
   theme?: {
     color?: string;
   };
   modal?: {
     ondismiss?: () => void;
   };
+  [key: string]: unknown;
 }
 
 interface RazorpayInstance {
   open: () => void;
+  on: (event: string, handler: (response: RazorpayPaymentFailedResponse) => void) => void;
 }
 
 declare global {
@@ -85,27 +105,11 @@ export default function CommitmentDetailPage({ params }: PageProps) {
   const [isVerifyingAI, setIsVerifyingAI] = useState(false);
   const [isResolving, setIsResolving] = useState(false);
   const [syncSuccessMsg, setSyncSuccessMsg] = useState<string | null>(null);
+  const nowMs = useCurrentTimestampMs();
+  const hasTriggeredResolutionRef = useRef(false);
+  const hasAutoSyncedRef = useRef(false);
 
-  const [isAskingCoach, setIsAskingCoach] = useState(false);
-  const msgCounter = useRef(1);
-  const [coachMessages, setCoachMessages] = useState<CoachMessage[]>([
-    {
-      id: "welcome",
-      sender: "coach",
-      text: "Hello! I am your AI Commitment Coach. I monitor your progress against mathematical rule evaluations to help you stay on track and protect your pledge.",
-      timestamp: "Today",
-    },
-  ]);
 
-  useEffect(() => {
-    if (typeof window !== "undefined" && !document.getElementById("razorpay-checkout-script")) {
-      const script = document.createElement("script");
-      script.id = "razorpay-checkout-script";
-      script.src = "https://checkout.razorpay.com/v1/checkout.js";
-      script.async = true;
-      document.body.appendChild(script);
-    }
-  }, []);
 
   const {
     data: commitment,
@@ -120,6 +124,10 @@ export default function CommitmentDetailPage({ params }: PageProps) {
       return res.commitment;
     },
     enabled: !!commitmentId,
+    refetchInterval: (query) => {
+      const c = query.state.data;
+      return c?.status === "ACTIVE" ? 30_000 : false;
+    },
   });
 
   const { data: userRepos } = useQuery<GitHubRepoItem[]>({
@@ -137,7 +145,8 @@ export default function CommitmentDetailPage({ params }: PageProps) {
       const res = await apiClient.commitments.getEvidence(commitmentId);
       return res.evidence;
     },
-    enabled: !!commitment && commitment.status === "ACTIVE",
+    enabled: !!commitment,
+    refetchInterval: commitment?.status === "ACTIVE" ? 30_000 : false,
   });
 
   const { data: progressData, refetch: refetchProgress } = useQuery<ProgressCalculation>({
@@ -146,7 +155,8 @@ export default function CommitmentDetailPage({ params }: PageProps) {
       const res = await apiClient.commitments.getProgress(commitmentId);
       return res.progress;
     },
-    enabled: !!commitment && commitment.status === "ACTIVE",
+    enabled: !!commitment,
+    refetchInterval: commitment?.status === "ACTIVE" ? 30_000 : false,
   });
 
   const { data: verificationData, refetch: refetchVerification } = useQuery<VerificationResult | null>({
@@ -165,6 +175,40 @@ export default function CommitmentDetailPage({ params }: PageProps) {
     },
     enabled: !!commitmentId,
   });
+
+  useEffect(() => {
+    if (!commitment || commitment.status !== "ACTIVE" || hasAutoSyncedRef.current) return;
+    hasAutoSyncedRef.current = true;
+    apiClient.commitments.syncEvidence(commitmentId).then(() => {
+      refetchEvidence();
+      refetchProgress();
+      refetchStatus();
+    }).catch(() => { /* silent */ });
+  }, [commitment, commitmentId, refetchEvidence, refetchProgress, refetchStatus]);
+
+  useEffect(() => {
+    if (!commitment || commitment.status !== "ACTIVE" || hasTriggeredResolutionRef.current) return;
+    if (!commitment.end_date || nowMs === 0) return;
+    const deadlineMs = new Date(commitment.end_date).getTime();
+    if (nowMs >= deadlineMs) {
+      hasTriggeredResolutionRef.current = true;
+      const timeoutId = setTimeout(async () => {
+        setIsResolving(true);
+        try {
+          await apiClient.commitments.checkResolution(commitmentId);
+          refetch();
+          refetchProgress();
+          refetchStatus();
+          refetchEvidence();
+        } catch {
+          // silent
+        } finally {
+          setIsResolving(false);
+        }
+      }, 0);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [nowMs, commitment, commitmentId, refetch, refetchProgress, refetchStatus, refetchEvidence]);
 
   const activeRepo =
     selectedRepo ||
@@ -244,43 +288,7 @@ export default function CommitmentDetailPage({ params }: PageProps) {
     }
   };
 
-  const handleAskCoach = async (questionText: string) => {
-    if (!questionText.trim()) return;
 
-    const userMsg: CoachMessage = {
-      id: `user_msg_${msgCounter.current++}`,
-      sender: "user",
-      text: questionText.trim(),
-      timestamp: "Just now",
-    };
-
-    setCoachMessages((prev) => [...prev, userMsg]);
-    setIsAskingCoach(true);
-
-    try {
-      const res = await apiClient.commitments.askCoach(commitmentId, questionText.trim());
-      const coachMsg: CoachMessage = {
-        id: `coach_msg_${msgCounter.current++}`,
-        sender: "coach",
-        text: res.reply,
-        timestamp: "Just now",
-      };
-      setCoachMessages((prev) => [...prev, coachMsg]);
-      if (res.progress) {
-        queryClient.setQueryData(["progress", commitmentId], res.progress);
-      }
-    } catch {
-      const errorMsg: CoachMessage = {
-        id: `coach_err_${msgCounter.current++}`,
-        sender: "coach",
-        text: "I am having trouble computing coach insights right now. Please verify your connection or try again in a moment.",
-        timestamp: "Just now",
-      };
-      setCoachMessages((prev) => [...prev, errorMsg]);
-    } finally {
-      setIsAskingCoach(false);
-    }
-  };
 
   const handlePledgePayment = async () => {
     if (!commitment) return;
@@ -300,6 +308,15 @@ export default function CommitmentDetailPage({ params }: PageProps) {
           name: "PledgePay Escrow",
           description: `Pledge for: ${commitment.title}`,
           order_id: orderData.razorpay_order_id,
+          prefill: {
+            name: "PledgePay Test User",
+            email: "demo@pledgepay.io",
+            contact: "9999999999",
+          },
+          retry: {
+            enabled: true,
+            max_count: 3,
+          },
           handler: async function (response) {
             setPaymentStep("verifying");
             try {
@@ -311,6 +328,9 @@ export default function CommitmentDetailPage({ params }: PageProps) {
               });
 
               queryClient.setQueryData(["commitments", commitment.id], verifyRes.commitment);
+              queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+              queryClient.invalidateQueries({ queryKey: ["commitments"] });
+              queryClient.refetchQueries({ queryKey: ["dashboard"] });
               setPaymentStep("success");
               refetch();
               refetchProgress();
@@ -334,8 +354,17 @@ export default function CommitmentDetailPage({ params }: PageProps) {
         };
 
         const rzp = new window.Razorpay(options);
+        rzp.on("payment.failed", function (failResp: RazorpayPaymentFailedResponse) {
+          setPaymentStep("error");
+          const reason =
+            failResp.error?.description ||
+            failResp.error?.reason ||
+            "Razorpay payment was declined or cancelled.";
+          setErrorMessage(`Payment failed: ${reason}`);
+        });
         rzp.open();
       } else {
+        // Fallback if Razorpay credentials are mock/offline
         setPaymentStep("verifying");
         const mockPayID = orderData.mock_payment_id || `pay_mock_${Date.now()}`;
         const mockSig = orderData.mock_signature || `sig_mock_${Date.now()}`;
@@ -348,6 +377,9 @@ export default function CommitmentDetailPage({ params }: PageProps) {
         });
 
         queryClient.setQueryData(["commitments", commitment.id], verifyRes.commitment);
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+        queryClient.invalidateQueries({ queryKey: ["commitments"] });
+        queryClient.refetchQueries({ queryKey: ["dashboard"] });
         setPaymentStep("success");
         refetch();
         refetchProgress();
@@ -507,13 +539,7 @@ export default function CommitmentDetailPage({ params }: PageProps) {
 
               {/* Right Column: AI Coach Chat & Cause */}
               <div className="space-y-6">
-                {commitment.status === "ACTIVE" && (
-                  <CoachChatPanel
-                    messages={coachMessages}
-                    isAskingCoach={isAskingCoach}
-                    onSendMessage={handleAskCoach}
-                  />
-                )}
+
 
                 {commitment.charity && (
                   <CharityCard charity={commitment.charity} />

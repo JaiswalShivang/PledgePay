@@ -22,6 +22,8 @@ import {
   KeyRound,
   Building2,
   ExternalLink,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { Button, Badge, Alert } from "@/components/ui";
 
@@ -102,6 +104,8 @@ export default function AdminPage() {
         text: data.message,
         utr: data.payout_id,
       });
+      refetchStats();
+      refetchTx();
       queryClient.invalidateQueries({ queryKey: ["admin"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["commitments"] });
@@ -111,6 +115,107 @@ export default function AdminPage() {
       setActionMessage({
         type: "destructive",
         text: msg,
+      });
+    },
+  });
+
+  // Charity management state & mutations
+  const [showAddCharity, setShowAddCharity] = useState(false);
+  const [newCharityName, setNewCharityName] = useState("");
+  const [newCharityCategory, setNewCharityCategory] = useState("Education");
+  const [newCharityDesc, setNewCharityDesc] = useState("");
+  const [newCharityWebsite, setNewCharityWebsite] = useState("");
+
+  const createCharityMutation = useMutation({
+    mutationFn: (data: {
+      name: string;
+      category: string;
+      description: string;
+      website_url?: string;
+    }) => apiClient.admin.createCharity(data),
+    onSuccess: (data) => {
+      setActionMessage({
+        type: "success",
+        text: `Charity "${data.charity.name}" added successfully to the protocol.`,
+      });
+      setShowAddCharity(false);
+      setNewCharityName("");
+      setNewCharityDesc("");
+      setNewCharityWebsite("");
+
+      // Optimistically update admin stats cache immediately
+      queryClient.setQueryData<AdminStats>(["admin", "stats"], (old) => {
+        if (!old) return old;
+        const newBreakdownItem = {
+          charity_id: data.charity.id,
+          name: data.charity.name,
+          category: data.charity.category,
+          website_url: data.charity.website_url || undefined,
+          logo_url: data.charity.logo_url || undefined,
+          total_received_paise: 0,
+          pending_disbursal_paise: 0,
+          total_pledges_count: 0,
+          disbursed_pledges_count: 0,
+        };
+        return {
+          ...old,
+          charity_breakdown: [...(old.charity_breakdown || []), newBreakdownItem],
+        };
+      });
+
+      refetchStats();
+      refetchTx();
+      queryClient.invalidateQueries({ queryKey: ["admin"] });
+      queryClient.invalidateQueries({ queryKey: ["charities"] });
+    },
+    onError: (err: unknown) => {
+      setActionMessage({
+        type: "destructive",
+        text: err instanceof Error ? err.message : "Failed to create charity",
+      });
+    },
+  });
+
+  const deleteCharityMutation = useMutation({
+    mutationFn: (charityId: string) => apiClient.admin.deleteCharity(charityId),
+    onMutate: async (charityId: string) => {
+      // Optimistically remove the charity from screen immediately
+      queryClient.setQueryData<AdminStats>(["admin", "stats"], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          charity_breakdown: (old.charity_breakdown || []).filter(
+            (c) => c.charity_id !== charityId
+          ),
+        };
+      });
+    },
+    onSuccess: (data, charityId) => {
+      setActionMessage({
+        type: "success",
+        text: data.message || "Charity deleted successfully from the protocol.",
+      });
+
+      queryClient.setQueryData<AdminStats>(["admin", "stats"], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          charity_breakdown: (old.charity_breakdown || []).filter(
+            (c) => c.charity_id !== charityId
+          ),
+        };
+      });
+
+      refetchStats();
+      refetchTx();
+      queryClient.invalidateQueries({ queryKey: ["admin"] });
+      queryClient.invalidateQueries({ queryKey: ["charities"] });
+    },
+    onError: (err: unknown) => {
+      refetchStats();
+      setActionMessage({
+        type: "destructive",
+        text: err instanceof Error ? err.message : "Failed to delete charity",
       });
     },
   });
@@ -340,18 +445,131 @@ export default function AdminPage() {
               <span>Charity Impact Breakdown &amp; Treasury Balances</span>
             </h2>
             <p className="text-xs text-[#71717A]">
-              Live breakdown of funds received and pending for each non-profit cause. Click any cause to filter the ledger.
+              Live breakdown of protocol funds received and pending for non-profit beneficiaries. Admin can add new charities or delete them.
             </p>
           </div>
-          {selectedCharityFilter && (
-            <button
-              onClick={() => setSelectedCharityFilter("")}
-              className="text-xs font-semibold text-[#047857] hover:underline"
+          <div className="flex items-center gap-2">
+            {selectedCharityFilter && (
+              <button
+                onClick={() => setSelectedCharityFilter("")}
+                className="text-xs font-semibold text-[#047857] hover:underline"
+              >
+                ✕ Clear Filter ({selectedCharityFilter})
+              </button>
+            )}
+            <Button
+              onClick={() => setShowAddCharity(!showAddCharity)}
+              variant="primary"
+              size="sm"
+              leftIcon={<Plus className="h-3.5 w-3.5" />}
             >
-              ✕ Clear Charity Filter ({selectedCharityFilter})
-            </button>
-          )}
+              Add Charity
+            </Button>
+          </div>
         </div>
+
+        {/* Add Charity Inline Form */}
+        {showAddCharity && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!newCharityName.trim() || !newCharityDesc.trim()) return;
+              createCharityMutation.mutate({
+                name: newCharityName.trim(),
+                category: newCharityCategory,
+                description: newCharityDesc.trim(),
+                website_url: newCharityWebsite.trim() || undefined,
+              });
+            }}
+            className="p-4 rounded-[8px] bg-white border border-[#047857] shadow-sm space-y-3"
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-[#E4E7EB]">
+              <h3 className="text-xs font-bold text-[#18181B] uppercase tracking-wider">
+                Add New Beneficiary Charity
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowAddCharity(false)}
+                className="text-xs text-[#71717A] hover:text-[#18181B]"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div className="space-y-1">
+                <label className="text-[11px] font-medium text-[#71717A]">Charity / NGO Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Save The Children India"
+                  value={newCharityName}
+                  onChange={(e) => setNewCharityName(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-[6px] border border-[#E4E7EB] text-xs focus:outline-none focus:border-[#047857]"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-medium text-[#71717A]">Category *</label>
+                <select
+                  value={newCharityCategory}
+                  onChange={(e) => setNewCharityCategory(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-[6px] border border-[#E4E7EB] text-xs bg-white focus:outline-none focus:border-[#047857]"
+                >
+                  <option value="Education">Education</option>
+                  <option value="Poverty Relief">Poverty Relief</option>
+                  <option value="Healthcare">Healthcare</option>
+                  <option value="Open Source">Open Source</option>
+                  <option value="Environment">Environment</option>
+                  <option value="Child Welfare">Child Welfare</option>
+                  <option value="Animal Welfare">Animal Welfare</option>
+                </select>
+              </div>
+
+              <div className="space-y-1 sm:col-span-2">
+                <label className="text-[11px] font-medium text-[#71717A]">Description *</label>
+                <textarea
+                  required
+                  rows={2}
+                  placeholder="Describe the cause, mission, and how funds will be used..."
+                  value={newCharityDesc}
+                  onChange={(e) => setNewCharityDesc(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-[6px] border border-[#E4E7EB] text-xs focus:outline-none focus:border-[#047857]"
+                />
+              </div>
+
+              <div className="space-y-1 sm:col-span-2">
+                <label className="text-[11px] font-medium text-[#71717A]">Website URL (optional)</label>
+                <input
+                  type="url"
+                  placeholder="https://example.org"
+                  value={newCharityWebsite}
+                  onChange={(e) => setNewCharityWebsite(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-[6px] border border-[#E4E7EB] text-xs focus:outline-none focus:border-[#047857]"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-[#E4E7EB]">
+              <Button
+                type="button"
+                onClick={() => setShowAddCharity(false)}
+                variant="secondary"
+                size="sm"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                isLoading={createCharityMutation.isPending}
+              >
+                Create Charity
+              </Button>
+            </div>
+          </form>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {(stats?.charity_breakdown || []).map((charity) => {
@@ -377,17 +595,34 @@ export default function AdminPage() {
                       {charity.category}
                     </span>
                   </div>
-                  {charity.website_url && (
-                    <a
-                      href={charity.website_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="text-[#71717A] hover:text-[#18181B]"
+                  <div className="flex items-center gap-1">
+                    {charity.website_url && (
+                      <a
+                        href={charity.website_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="p-1 text-[#71717A] hover:text-[#18181B] rounded hover:bg-[#F4F4F5]"
+                        title="Visit website"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </a>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm(`Are you sure you want to delete "${charity.name}" from the protocol?`)) {
+                          deleteCharityMutation.mutate(charity.charity_id);
+                        }
+                      }}
+                      className="p-1 text-[#EF4444] hover:text-[#DC2626] rounded hover:bg-[#FEE2E2] transition-colors"
+                      title="Delete Charity"
+                      disabled={deleteCharityMutation.isPending}
                     >
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
-                  )}
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 pt-1 border-t border-[#E4E7EB] text-xs">
