@@ -145,9 +145,14 @@ func (c *GitHubClient) ListUserRepos(ctx context.Context, token string) ([]GitHu
 	return repos, nil
 }
 
-func (c *GitHubClient) FetchCommits(ctx context.Context, token, repo string, since time.Time) ([]models.Evidence, error) {
-	url := fmt.Sprintf("https://api.github.com/repos/%s/commits?since=%s&per_page=50", repo, since.Format(time.RFC3339))
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+func (c *GitHubClient) FetchCommits(ctx context.Context, token, repo string, since time.Time, opts ...FetchOpts) ([]models.Evidence, error) {
+	var opt FetchOpts
+	if len(opts) > 0 {
+		opt = opts[0]
+	}
+
+	fetchURL := fmt.Sprintf("https://api.github.com/repos/%s/commits?since=%s&per_page=50", repo, since.Format(time.RFC3339))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fetchURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -194,6 +199,13 @@ func (c *GitHubClient) FetchCommits(ctx context.Context, token, repo string, sin
 		occurredAt := item.Commit.Author.Date
 		if occurredAt.IsZero() {
 			occurredAt = time.Now().UTC()
+		}
+
+		if !opt.Until.IsZero() && occurredAt.After(opt.Until) {
+			continue
+		}
+		if opt.AuthorLogin != "" && !strings.EqualFold(authorName, opt.AuthorLogin) {
+			continue
 		}
 
 		items = append(items, models.Evidence{
@@ -302,14 +314,14 @@ func (c *GitHubClient) FetchIssues(ctx context.Context, token, repo string, sinc
 	}
 
 	var apiIssues []struct {
-		ID            int64     `json:"id"`
-		Number        int       `json:"number"`
-		Title         string    `json:"title"`
-		State         string    `json:"state"`
-		CreatedAt     time.Time `json:"created_at"`
-		HTMLURL       string    `json:"html_url"`
-		PullRequest   *struct{} `json:"pull_request,omitempty"`
-		User          struct {
+		ID          int64     `json:"id"`
+		Number      int       `json:"number"`
+		Title       string    `json:"title"`
+		State       string    `json:"state"`
+		CreatedAt   time.Time `json:"created_at"`
+		HTMLURL     string    `json:"html_url"`
+		PullRequest *struct{} `json:"pull_request,omitempty"`
+		User        struct {
 			Login string `json:"login"`
 		} `json:"user"`
 	}
@@ -341,7 +353,17 @@ func (c *GitHubClient) FetchIssues(ctx context.Context, token, repo string, sinc
 	return items, nil
 }
 
-func (c *GitHubClient) FetchAllEvidence(ctx context.Context, token, repo string, since time.Time) ([]models.Evidence, error) {
+type FetchOpts struct {
+	Until       time.Time
+	AuthorLogin string
+}
+
+func (c *GitHubClient) FetchAllEvidence(ctx context.Context, token, repo string, since time.Time, opts ...FetchOpts) ([]models.Evidence, error) {
+	var opt FetchOpts
+	if len(opts) > 0 {
+		opt = opts[0]
+	}
+
 	g, gctx := errgroup.WithContext(ctx)
 
 	var commits []models.Evidence
@@ -350,19 +372,46 @@ func (c *GitHubClient) FetchAllEvidence(ctx context.Context, token, repo string,
 
 	g.Go(func() error {
 		var err error
-		commits, err = c.FetchCommits(gctx, token, repo, since)
+		commits, err = c.FetchCommits(gctx, token, repo, since, opt)
 		return err
 	})
 
 	g.Go(func() error {
 		var err error
 		prs, err = c.FetchPullRequests(gctx, token, repo, since)
+		// Filter PRs by window and author
+		if err == nil {
+			var filtered []models.Evidence
+			for _, pr := range prs {
+				if !opt.Until.IsZero() && pr.OccurredAt.After(opt.Until) {
+					continue
+				}
+				if opt.AuthorLogin != "" {
+					if author, ok := pr.RawPayload["author"].(string); ok {
+						if !strings.EqualFold(author, opt.AuthorLogin) {
+							continue
+						}
+					}
+				}
+				filtered = append(filtered, pr)
+			}
+			prs = filtered
+		}
 		return err
 	})
 
 	g.Go(func() error {
 		var err error
 		issues, err = c.FetchIssues(gctx, token, repo, since)
+		if err == nil && !opt.Until.IsZero() {
+			var filtered []models.Evidence
+			for _, iss := range issues {
+				if !iss.OccurredAt.After(opt.Until) {
+					filtered = append(filtered, iss)
+				}
+			}
+			issues = filtered
+		}
 		return err
 	})
 

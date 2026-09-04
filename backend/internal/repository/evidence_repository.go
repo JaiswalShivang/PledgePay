@@ -29,7 +29,6 @@ func (r *evidenceRepository) CreateBatch(ctx context.Context, items []models.Evi
 	return r.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns: []clause.Column{
 			{Name: "commitment_id"},
-			{Name: "source"},
 			{Name: "source_ref"},
 		},
 		DoNothing: true,

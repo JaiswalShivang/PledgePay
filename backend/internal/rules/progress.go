@@ -35,6 +35,9 @@ func CalculateProgress(commitment *models.Commitment, evidence []models.Evidence
 
 	verifiedCount := 0
 	for _, item := range evidence {
+		if item.OccurredAt.Before(commitment.StartDate) || item.OccurredAt.After(commitment.EndDate) {
+			continue
+		}
 		if isPRUnit {
 			if item.Source == "github_pr" {
 				verifiedCount++
@@ -59,14 +62,23 @@ func CalculateProgress(commitment *models.Commitment, evidence []models.Evidence
 	}
 	progressPct = math.Round(progressPct*100) / 100
 
+	totalDuration := commitment.EndDate.Sub(commitment.StartDate)
+	if totalDuration <= 0 {
+		totalDuration = 24 * time.Hour
+	}
+	elapsed := now.Sub(commitment.StartDate)
+	if elapsed < 0 {
+		elapsed = 0
+	}
+
 	daysRemaining := int(math.Ceil(commitment.EndDate.Sub(now).Hours() / 24.0))
 	if daysRemaining < 0 {
 		daysRemaining = 0
 	}
 
-	elapsedDays := now.Sub(commitment.StartDate).Hours() / 24.0
-	if elapsedDays < 1.0 {
-		elapsedDays = 1.0
+	elapsedDays := elapsed.Hours() / 24.0
+	if elapsedDays < 0.1 {
+		elapsedDays = 0.1
 	}
 
 	durationDays := float64(commitment.DurationDays)
@@ -83,12 +95,19 @@ func CalculateProgress(commitment *models.Commitment, evidence []models.Evidence
 	status := StatusOnTrack
 	if progressPct >= 100.0 {
 		status = StatusOnTrack
-	} else if actualPace >= requiredPace*0.85 {
-		status = StatusOnTrack
-	} else if actualPace >= requiredPace*0.5 {
-		status = StatusAtRisk
-	} else {
+	} else if now.After(commitment.EndDate) {
 		status = StatusBehind
+	} else {
+		elapsedPct := (float64(elapsed) / float64(totalDuration)) * 100.0
+		if elapsedPct <= 35.0 {
+			status = StatusOnTrack
+		} else if progressPct >= elapsedPct*0.7 {
+			status = StatusOnTrack
+		} else if progressPct >= elapsedPct*0.35 {
+			status = StatusAtRisk
+		} else {
+			status = StatusBehind
+		}
 	}
 
 	return ProgressCalculation{
