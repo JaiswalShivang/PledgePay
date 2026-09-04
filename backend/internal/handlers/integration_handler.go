@@ -124,6 +124,13 @@ func (h *IntegrationHandler) GitHubCallback(c *gin.Context) {
 	redirectURL := "http://localhost:3000/profile?github_connected=true"
 	if len(parts) > 1 && parts[1] != "" {
 		redirectURL = parts[1]
+		if !strings.Contains(redirectURL, "github_connected=true") {
+			if strings.Contains(redirectURL, "?") {
+				redirectURL += "&github_connected=true"
+			} else {
+				redirectURL += "?github_connected=true"
+			}
+		}
 	}
 
 	c.Redirect(http.StatusTemporaryRedirect, redirectURL)

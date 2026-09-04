@@ -132,6 +132,10 @@ func (s *Server) setupRoutes() {
 		if integrationRepo != nil && userRepo != nil && commitmentRepo != nil && evidenceRepo != nil {
 			integrationHandler := handlers.NewIntegrationHandler(s.Config, githubClient, integrationRepo, userRepo, commitmentRepo, evidenceRepo)
 
+			// GitHub OAuth callback routes - handles both /api/auth/github/callback and /api/v1/integrations/github/callback
+			s.Router.GET("/api/auth/github/callback", integrationHandler.GitHubCallback)
+			s.Router.GET("/api/v1/auth/github/callback", integrationHandler.GitHubCallback)
+			s.Router.GET("/auth/github/callback", integrationHandler.GitHubCallback)
 			v1.GET("/integrations/github/callback", integrationHandler.GitHubCallback)
 
 			intGroup := v1.Group("/integrations")
