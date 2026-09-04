@@ -30,15 +30,16 @@ func NewCommitmentHandler(
 }
 
 type CreateCommitmentRequest struct {
-	Title        string   `json:"title" binding:"required"`
-	Description  *string  `json:"description"`
-	TargetCount  int      `json:"target_count" binding:"required,min=1"`
-	Unit         string   `json:"unit" binding:"required"`
-	DurationDays int      `json:"duration_days" binding:"required,min=1"`
-	EvidenceType string   `json:"evidence_type"`
-	AmountPaise  int64    `json:"amount_paise" binding:"required,min=100"`
-	QualityScore *float64 `json:"quality_score"`
-	CharityID    string   `json:"charity_id" binding:"required"`
+	Title           string   `json:"title" binding:"required"`
+	Description     *string  `json:"description"`
+	TargetCount     int      `json:"target_count" binding:"required,min=1"`
+	Unit            string   `json:"unit" binding:"required"`
+	DurationDays    int      `json:"duration_days" binding:"required,min=1"`
+	DurationMinutes *int     `json:"duration_minutes"`
+	EvidenceType    string   `json:"evidence_type"`
+	AmountPaise     int64    `json:"amount_paise" binding:"required,min=100"`
+	QualityScore    *float64 `json:"quality_score"`
+	CharityID       string   `json:"charity_id" binding:"required"`
 }
 
 func (h *CommitmentHandler) CreateCommitment(c *gin.Context) {
@@ -86,17 +87,21 @@ func (h *CommitmentHandler) CreateCommitment(c *gin.Context) {
 	startDate := time.Now().UTC()
 	endDate := startDate.AddDate(0, 0, req.DurationDays)
 
-	lowerTitle := strings.ToLower(req.Title)
-	reMin := regexp.MustCompile(`(?i)(\d+)\s*(?:minutes?|mins?)\b`)
-	if m := reMin.FindStringSubmatch(lowerTitle); len(m) > 1 {
-		if n, err := strconv.Atoi(m[1]); err == nil && n > 0 {
-			endDate = startDate.Add(time.Duration(n) * time.Minute)
+	if req.DurationMinutes != nil && *req.DurationMinutes > 0 {
+		endDate = startDate.Add(time.Duration(*req.DurationMinutes) * time.Minute)
+	} else {
+		lowerTitle := strings.ToLower(req.Title)
+		reMin := regexp.MustCompile(`(?i)(?:in\s+)?(?:next\s+)?(\d+)\s*(?:minutes?|mins?|mintest?|mints?|minuts?|m)\b`)
+		if m := reMin.FindStringSubmatch(lowerTitle); len(m) > 1 {
+			if n, err := strconv.Atoi(m[1]); err == nil && n > 0 {
+				endDate = startDate.Add(time.Duration(n) * time.Minute)
+			}
 		}
-	}
-	reHr := regexp.MustCompile(`(?i)(\d+)\s*(?:hours?|hrs?)\b`)
-	if m := reHr.FindStringSubmatch(lowerTitle); len(m) > 1 {
-		if n, err := strconv.Atoi(m[1]); err == nil && n > 0 {
-			endDate = startDate.Add(time.Duration(n) * time.Hour)
+		reHr := regexp.MustCompile(`(?i)(\d+)\s*(?:hours?|hrs?)\b`)
+		if m := reHr.FindStringSubmatch(lowerTitle); len(m) > 1 {
+			if n, err := strconv.Atoi(m[1]); err == nil && n > 0 {
+				endDate = startDate.Add(time.Duration(n) * time.Hour)
+			}
 		}
 	}
 

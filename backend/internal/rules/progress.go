@@ -38,7 +38,31 @@ func CalculateProgress(commitment *models.Commitment, evidence []models.Evidence
 		if item.OccurredAt.Before(commitment.StartDate) || item.OccurredAt.After(commitment.EndDate) {
 			continue
 		}
-		if isPRUnit {
+		if item.Source == "document_proof" {
+			if strings.Contains(unitLower, "word") {
+				if w, ok := item.RawPayload["total_words"]; ok {
+					switch v := w.(type) {
+					case float64:
+						verifiedCount += int(v)
+					case int:
+						verifiedCount += v
+					}
+				} else {
+					verifiedCount++
+				}
+			} else {
+				if p, ok := item.RawPayload["page_count"]; ok {
+					switch v := p.(type) {
+					case float64:
+						verifiedCount += int(v)
+					case int:
+						verifiedCount += v
+					}
+				} else {
+					verifiedCount++
+				}
+			}
+		} else if isPRUnit {
 			if item.Source == "github_pr" {
 				verifiedCount++
 			}

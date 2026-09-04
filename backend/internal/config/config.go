@@ -38,7 +38,7 @@ func Load() *Config {
 		GitHubClientID:     getEnv("GITHUB_CLIENT_ID", ""),
 		GitHubClientSecret: getEnv("GITHUB_CLIENT_SECRET", ""),
 		GroqAPIKey:         getEnv("GROQ_API_KEY", ""),
-		GroqModel:          getEnv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+		GroqModel:          getEnv("GROQ_MODEL", "openai/gpt-oss-120b"),
 		WorkerPoolSize:     getEnvInt("WORKER_POOL_SIZE", 10),
 	}
 }

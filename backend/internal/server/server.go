@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -95,6 +96,9 @@ func (s *Server) setupRoutes() {
 		s.EvidenceSyncer = evidencesync.New(githubClient, integrationRepo, userRepo, evidenceRepo)
 	}
 
+	_ = os.MkdirAll("uploads", 0755)
+	s.Router.Static("/uploads", "./uploads")
+
 	v1 := s.Router.Group("/api/v1")
 	{
 		if userRepo != nil {
@@ -177,6 +181,12 @@ func (s *Server) setupRoutes() {
 					commGroup.POST("/:id/verify", verificationHandler.VerifyCommitment)
 					commGroup.GET("/:id/verification", verificationHandler.GetLatestVerification)
 					commGroup.POST("/:id/coach", coachHandler.AskCoach)
+				}
+
+				if evidenceRepo != nil {
+					documentHandler := handlers.NewDocumentHandler(commitmentRepo, evidenceRepo, groqClient)
+					commGroup.POST("/:id/upload-document", documentHandler.UploadDocumentProof)
+					commGroup.GET("/:id/document-proof", documentHandler.GetDocumentProof)
 				}
 
 				if resolver != nil {
