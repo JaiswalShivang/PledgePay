@@ -75,3 +75,56 @@ func TestExtractGoalParametersAndQuality(t *testing.T) {
 		t.Errorf("expected 0 issues for a clear goal, got %d: %v", len(quality.Issues), quality.Issues)
 	}
 }
+
+func TestDocumentTopicMismatch(t *testing.T) {
+	cssGoal := "complete today css notes"
+
+	// 1. Off-topic test: Git notes uploaded for CSS goal
+	gitNotesText := `
+	Git Version Control Notes
+	Today I learned how to use Git for version control.
+	1. git init to initialize a new repository.
+	2. git status to check modified files.
+	3. git add . to stage changes in the staging index.
+	4. git commit -m "feat: initial commit" to record snapshots.
+	5. git branch feature/login to create a new branch.
+	6. git checkout feature/login to switch branches.
+	7. git merge to merge changes into main.
+	8. git push origin main to upload commits to GitHub.
+	`
+
+	resMismatch := AuditDocumentContentFallback(cssGoal, "", 1, gitNotesText)
+	if resMismatch.IsRelevant {
+		t.Errorf("Expected IsRelevant to be false for Git notes on CSS goal, got true")
+	}
+	if resMismatch.SatisfiesGoal {
+		t.Errorf("Expected SatisfiesGoal to be false for Git notes on CSS goal, got true")
+	}
+	if resMismatch.DetectedTopic != "Git & Version Control" {
+		t.Errorf("Expected DetectedTopic 'Git & Version Control', got '%s'", resMismatch.DetectedTopic)
+	}
+	t.Logf("Mismatch correctly identified: %s (Reasoning: %s)", resMismatch.DetectedTopic, resMismatch.Reasoning)
+
+	// 2. On-topic test: CSS notes uploaded for CSS goal
+	cssNotesText := `
+	CSS Web Styling Notes
+	1. CSS Box Model: content, padding, border, and margin.
+	2. Box-sizing: border-box includes padding and border in the element's total width.
+	3. Flexbox layout: display: flex, flex-direction: column, justify-content: center, align-items: center.
+	4. CSS Grid: display: grid, grid-template-columns: repeat(3, 1fr).
+	5. CSS Selectors: class selector .btn, id selector #header, pseudo-class :hover, :focus.
+	6. Responsive styles: @media (min-width: 768px) for tablet and desktop viewports.
+	`
+
+	resMatch := AuditDocumentContentFallback(cssGoal, "", 1, cssNotesText)
+	if !resMatch.IsRelevant {
+		t.Errorf("Expected IsRelevant to be true for CSS notes on CSS goal, got false")
+	}
+	if !resMatch.SatisfiesGoal {
+		t.Errorf("Expected SatisfiesGoal to be true for CSS notes on CSS goal, got false")
+	}
+	if resMatch.DetectedTopic != "CSS & Web Styling" {
+		t.Errorf("Expected DetectedTopic 'CSS & Web Styling', got '%s'", resMatch.DetectedTopic)
+	}
+	t.Logf("Match correctly verified: %s (Reasoning: %s)", resMatch.DetectedTopic, resMatch.Reasoning)
+}

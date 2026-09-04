@@ -232,6 +232,9 @@ func (s *Server) setupRoutes() {
 				adminGroup.GET("/stats", adminHandler.GetAdminStats)
 				adminGroup.GET("/transactions", adminHandler.GetAdminTransactions)
 				adminGroup.POST("/payout", adminHandler.ReleasePayout)
+				adminGroup.GET("/charities", adminHandler.ListCharities)
+				adminGroup.POST("/charities", adminHandler.CreateCharity)
+				adminGroup.DELETE("/charities/:id", adminHandler.DeleteCharity)
 			}
 		}
 	}

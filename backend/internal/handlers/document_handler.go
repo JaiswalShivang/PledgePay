@@ -186,7 +186,7 @@ func (h *DocumentHandler) UploadDocumentProof(c *gin.Context) {
 	deadlineMet := time.Now().UTC().Before(commitment.EndDate) || time.Now().UTC().Equal(commitment.EndDate)
 
 	// Overall Verification Verdict
-	isFullyVerified := extraction.PagesMet && !extraction.IsDuplicateDetected && !extraction.IsEmpty && aiAudit.IsRelevant && aiAudit.IsSubstantial
+	isFullyVerified := extraction.PagesMet && !extraction.IsDuplicateDetected && !extraction.IsEmpty && aiAudit.IsRelevant && aiAudit.IsSubstantial && aiAudit.SatisfiesGoal
 
 	confidenceLabel := fmt.Sprintf("%s (%.1f%%)", aiAudit.ConfidenceRating, extraction.MeanConfidence)
 
@@ -209,7 +209,8 @@ func (h *DocumentHandler) UploadDocumentProof(c *gin.Context) {
 			"relevance":             aiAudit.IsRelevant,
 			"relevance_score":       aiAudit.RelevanceScore,
 			"sufficiency":           aiAudit.IsSubstantial,
-			"satisfies_goal":        aiAudit.SatisfiesGoal,
+			"satisfies_goal":        isFullyVerified,
+			"verified":              isFullyVerified,
 			"detected_topic":        aiAudit.DetectedTopic,
 			"reasoning":             aiAudit.Reasoning,
 			"ocr_engine":            extraction.OCREngine,
@@ -222,14 +223,19 @@ func (h *DocumentHandler) UploadDocumentProof(c *gin.Context) {
 		return
 	}
 
+	statusLabel := "verified"
+	if !isFullyVerified {
+		statusLabel = "rejected"
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"status": "verified",
+		"status": statusLabel,
 		"verdict": gin.H{
 			"commitment_verified":  isFullyVerified,
 			"pages_verified":       fmt.Sprintf("%d / %d", extraction.PageCount, targetPages),
 			"pages_count":          extraction.PageCount,
 			"target_pages":         targetPages,
-			"content_relevance":    map[bool]string{true: "Relevant", false: "Irrelevant"}[aiAudit.IsRelevant],
+			"content_relevance":    map[bool]string{true: "Relevant", false: "Irrelevant (Topic Mismatch)"}[aiAudit.IsRelevant],
 			"evidence_sufficiency": map[bool]string{true: "Sufficient", false: "Insufficient"}[aiAudit.IsSubstantial],
 			"deadline_met":         map[bool]string{true: "Met", false: "Past Deadline"}[deadlineMet],
 			"confidence":           confidenceLabel,

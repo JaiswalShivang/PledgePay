@@ -10,8 +10,10 @@ import (
 type CharityRepository interface {
 	Create(ctx context.Context, charity *models.Charity) error
 	ListActive(ctx context.Context) ([]models.Charity, error)
+	ListAll(ctx context.Context) ([]models.Charity, error)
 	GetByID(ctx context.Context, id string) (*models.Charity, error)
 	GetByIDs(ctx context.Context, ids []string) ([]models.Charity, error)
+	Delete(ctx context.Context, id string) error
 }
 
 type charityRepository struct {
@@ -37,6 +39,16 @@ func (r *charityRepository) ListActive(ctx context.Context) ([]models.Charity, e
 	return charities, nil
 }
 
+func (r *charityRepository) ListAll(ctx context.Context) ([]models.Charity, error) {
+	var charities []models.Charity
+	if err := r.db.WithContext(ctx).
+		Order("is_active DESC, category ASC, name ASC").
+		Find(&charities).Error; err != nil {
+		return nil, err
+	}
+	return charities, nil
+}
+
 func (r *charityRepository) GetByID(ctx context.Context, id string) (*models.Charity, error) {
 	var charity models.Charity
 	if err := r.db.WithContext(ctx).First(&charity, "id = ?", id).Error; err != nil {
@@ -54,4 +66,13 @@ func (r *charityRepository) GetByIDs(ctx context.Context, ids []string) ([]model
 		return nil, err
 	}
 	return charities, nil
+}
+
+func (r *charityRepository) Delete(ctx context.Context, id string) error {
+	var count int64
+	r.db.WithContext(ctx).Table("commitments").Where("charity_id = ?", id).Count(&count)
+	if count > 0 {
+		return r.db.WithContext(ctx).Model(&models.Charity{}).Where("id = ?", id).Update("is_active", false).Error
+	}
+	return r.db.WithContext(ctx).Delete(&models.Charity{}, "id = ?", id).Error
 }

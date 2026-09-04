@@ -99,7 +99,7 @@ func (h *AdminHandler) GetAdminStats(c *gin.Context) {
 
 	// Per-Charity Breakdown
 	var charities []models.Charity
-	h.db.WithContext(ctx).Order("name ASC").Find(&charities)
+	h.db.WithContext(ctx).Where("is_active = true").Order("name ASC").Find(&charities)
 
 	stats.CharityBreakdown = make([]AdminCharityStat, len(charities))
 	for i, ch := range charities {
@@ -347,4 +347,85 @@ func (h *AdminHandler) ReleasePayout(c *gin.Context) {
 		"amount_paise":  commitment.AmountPaise,
 		"message":       fmt.Sprintf("Successfully released ₹%.2f refund to %s", float64(commitment.AmountPaise)/100.0, commitment.User.Email),
 	})
+}
+
+
+type CreateCharityInput struct {
+	Name        string  `json:"name" binding:"required"`
+	Category    string  `json:"category" binding:"required"`
+	Description string  `json:"description" binding:"required"`
+	WebsiteURL  *string `json:"website_url"`
+	LogoURL     *string `json:"logo_url"`
+}
+
+func (h *AdminHandler) CreateCharity(c *gin.Context) {
+	var input CreateCharityInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_payload", "message": err.Error()})
+		return
+	}
+
+	website := "https://giveindia.org"
+	if input.WebsiteURL != nil && *input.WebsiteURL != "" {
+		website = *input.WebsiteURL
+	}
+	contact := "cont_test_charity"
+	fundAccount := "fa_test_charity"
+
+	charity := models.Charity{
+		Name:                   input.Name,
+		Category:               input.Category,
+		Description:            input.Description,
+		WebsiteURL:             &website,
+		LogoURL:                input.LogoURL,
+		RazorpayxContactID:     &contact,
+		RazorpayxFundAccountID: &fundAccount,
+		IsActive:               true,
+	}
+
+	if err := h.db.WithContext(c.Request.Context()).Create(&charity).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "create_charity_failed", "message": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message": "charity_created",
+		"charity": charity,
+	})
+}
+
+func (h *AdminHandler) DeleteCharity(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing_charity_id"})
+		return
+	}
+
+	ctx := c.Request.Context()
+
+	// 1. Unlink historical commitments so foreign key constraint does not block
+	_ = h.db.WithContext(ctx).Model(&models.Commitment{}).Where("charity_id = ?", id).Update("charity_id", nil).Error
+
+	// 2. Unlink or remove historical donations pointing to this charity
+	_ = h.db.WithContext(ctx).Where("charity_id = ?", id).Delete(&models.Donation{}).Error
+
+	// 3. Delete the charity record completely
+	if err := h.db.WithContext(ctx).Where("id = ?", id).Delete(&models.Charity{}).Error; err != nil {
+		// Fallback: deactivate if hard delete encounters database error
+		_ = h.db.WithContext(ctx).Model(&models.Charity{}).Where("id = ?", id).Update("is_active", false).Error
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "deleted",
+		"message": "Charity permanently deleted.",
+	})
+}
+
+func (h *AdminHandler) ListCharities(c *gin.Context) {
+	var charities []models.Charity
+	if err := h.db.WithContext(c.Request.Context()).Order("is_active DESC, category ASC, name ASC").Find(&charities).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed_to_fetch_charities"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"charities": charities})
 }

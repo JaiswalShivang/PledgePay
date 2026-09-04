@@ -39,6 +39,19 @@ func CalculateProgress(commitment *models.Commitment, evidence []models.Evidence
 			continue
 		}
 		if item.Source == "document_proof" {
+			if rel, ok := item.RawPayload["relevance"].(bool); ok && !rel {
+				continue
+			}
+			if sat, ok := item.RawPayload["satisfies_goal"].(bool); ok && !sat {
+				continue
+			}
+			if dup, ok := item.RawPayload["is_duplicate_detected"].(bool); ok && dup {
+				continue
+			}
+			if empty, ok := item.RawPayload["is_empty"].(bool); ok && empty {
+				continue
+			}
+
 			if strings.Contains(unitLower, "word") {
 				if w, ok := item.RawPayload["total_words"]; ok {
 					switch v := w.(type) {
