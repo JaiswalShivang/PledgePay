@@ -38,8 +38,8 @@ func (r *commitmentRepository) GetByID(ctx context.Context, id string) (*models.
 	if err := r.db.WithContext(ctx).
 		Preload("Charity").
 		Preload("Rules").
-		Preload("Payments").
-		Preload("VerificationResults").
+		Preload("Payment").
+		Preload("Donation").
 		First(&commitment, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
@@ -65,10 +65,8 @@ func (r *commitmentRepository) ListByUserID(ctx context.Context, userID string) 
 	if err := r.db.WithContext(ctx).
 		Preload("Charity").
 		Preload("Rules").
-		Preload("Payments").
-		Preload("VerificationResults", func(db *gorm.DB) *gorm.DB {
-			return db.Order("created_at DESC").Limit(1)
-		}).
+		Preload("Payment").
+		Preload("Donation").
 		Where("user_id = ?", userID).
 		Order("created_at DESC").
 		Find(&commitments).Error; err != nil {
@@ -82,6 +80,8 @@ func (r *commitmentRepository) ListActiveCommitments(ctx context.Context) ([]mod
 	if err := r.db.WithContext(ctx).
 		Preload("Charity").
 		Preload("Rules").
+		Preload("Payment").
+		Preload("Donation").
 		Where("status = ? AND end_date >= ?", "ACTIVE", time.Now().UTC()).
 		Find(&commitments).Error; err != nil {
 		return nil, err
@@ -108,7 +108,9 @@ func (r *commitmentRepository) AddRule(ctx context.Context, rule *models.Commitm
 
 func (r *commitmentRepository) GetRules(ctx context.Context, commitmentID string) ([]models.CommitmentRule, error) {
 	var rules []models.CommitmentRule
-	if err := r.db.WithContext(ctx).Where("commitment_id = ?", commitmentID).Find(&rules).Error; err != nil {
+	if err := r.db.WithContext(ctx).
+		Where("commitment_id = ?", commitmentID).
+		Find(&rules).Error; err != nil {
 		return nil, err
 	}
 	return rules, nil

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -40,20 +41,28 @@ type LoginRequest struct {
 }
 
 type UserResponse struct {
-	ID             string    `json:"id"`
-	Email          string    `json:"email"`
-	Name           string    `json:"name"`
-	GithubUsername *string   `json:"github_username,omitempty"`
-	CreatedAt      time.Time `json:"created_at"`
+	ID                   string    `json:"id"`
+	Email                string    `json:"email"`
+	Name                 string    `json:"name"`
+	GithubUsername       *string   `json:"github_username,omitempty"`
+	CodeforcesUsername   *string   `json:"codeforces_username,omitempty"`
+	Role                 string    `json:"role"`
+	CreatedAt            time.Time `json:"created_at"`
 }
 
 func toUserResponse(user *models.User) UserResponse {
+	role := user.Role
+	if role == "" {
+		role = "user"
+	}
 	return UserResponse{
-		ID:             user.ID,
-		Email:          user.Email,
-		Name:           user.Name,
-		GithubUsername: user.GithubUsername,
-		CreatedAt:      user.CreatedAt,
+		ID:                   user.ID,
+		Email:                user.Email,
+		Name:                 user.Name,
+		GithubUsername:       user.GithubUsername,
+		CodeforcesUsername:   user.CodeforcesUsername,
+		Role:                 role,
+		CreatedAt:            user.CreatedAt,
 	}
 }
 
@@ -75,15 +84,17 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		})
 		return
 	} else if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		slog.Error("Failed to check email availability", "error", err, "email", req.Email)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "database_error",
-			"message": "failed to check email availability",
+			"message": "failed to check email availability: " + err.Error(),
 		})
 		return
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
+		slog.Error("Failed to hash password", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "crypto_error",
 			"message": "failed to hash password",
@@ -91,18 +102,22 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
+	now := time.Now().UTC()
 	user := &models.User{
 		ID:             uuid.New().String(),
 		Email:          req.Email,
 		PasswordHash:   string(hashedPassword),
 		Name:           req.Name,
 		GithubUsername: req.GithubUsername,
+		CreatedAt:      now,
+		UpdatedAt:      now,
 	}
 
 	if err := h.userRepo.Create(c.Request.Context(), user); err != nil {
+		slog.Error("Failed to create user account in database", "error", err, "user_id", user.ID)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "database_error",
-			"message": "failed to create user account",
+			"message": "failed to create user account: " + err.Error(),
 		})
 		return
 	}
@@ -145,9 +160,10 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			})
 			return
 		}
+		slog.Error("Failed to look up user account", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "database_error",
-			"message": "failed to look up user account",
+			"message": "failed to look up user account: " + err.Error(),
 		})
 		return
 	}
@@ -236,12 +252,13 @@ func (h *AuthHandler) GetMe(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"user": gin.H{
-			"id":              user.ID,
-			"email":           user.Email,
-			"name":            user.Name,
-			"github_username": user.GithubUsername,
-			"created_at":      user.CreatedAt,
-			"integrations":    integrations,
+			"id":                   user.ID,
+			"email":                user.Email,
+			"name":                 user.Name,
+			"github_username":      user.GithubUsername,
+			"codeforces_username":  user.CodeforcesUsername,
+			"created_at":           user.CreatedAt,
+			"integrations":         integrations,
 		},
 	})
 }

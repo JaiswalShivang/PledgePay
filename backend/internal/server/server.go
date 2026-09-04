@@ -11,21 +11,26 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jaiswalshivang/pledgepay/internal/ai"
 	"github.com/jaiswalshivang/pledgepay/internal/config"
+	"github.com/jaiswalshivang/pledgepay/internal/evidencesync"
 	"github.com/jaiswalshivang/pledgepay/internal/github"
 	"github.com/jaiswalshivang/pledgepay/internal/handlers"
 	"github.com/jaiswalshivang/pledgepay/internal/middleware"
+	"github.com/jaiswalshivang/pledgepay/internal/models"
 	"github.com/jaiswalshivang/pledgepay/internal/payment"
 	"github.com/jaiswalshivang/pledgepay/internal/payout"
 	"github.com/jaiswalshivang/pledgepay/internal/repository"
 	"github.com/redis/go-redis/v9"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
 type Server struct {
-	Router *gin.Engine
-	Config *config.Config
-	DB     *gorm.DB
-	Redis  *redis.Client
+	Router         *gin.Engine
+	Config         *config.Config
+	DB             *gorm.DB
+	Redis          *redis.Client
+	Resolver       *payout.Resolver
+	EvidenceSyncer *evidencesync.Syncer
 }
 
 func New(cfg *config.Config, db *gorm.DB, rdb *redis.Client) *Server {
@@ -83,6 +88,11 @@ func (s *Server) setupRoutes() {
 	var resolver *payout.Resolver
 	if s.DB != nil && donationRepo != nil && evidenceRepo != nil && verificationRepo != nil && commitmentRepo != nil && charityRepo != nil {
 		resolver = payout.NewResolver(s.DB, razorpayXClient, commitmentRepo, charityRepo, donationRepo, evidenceRepo, verificationRepo)
+		s.Resolver = resolver
+	}
+
+	if integrationRepo != nil && userRepo != nil && evidenceRepo != nil {
+		s.EvidenceSyncer = evidencesync.New(githubClient, integrationRepo, userRepo, evidenceRepo)
 	}
 
 	v1 := s.Router.Group("/api/v1")
@@ -129,7 +139,9 @@ func (s *Server) setupRoutes() {
 			{
 				intGroup.GET("/github/connect", integrationHandler.ConnectGitHub)
 				intGroup.GET("/github/repos", integrationHandler.ListUserRepos)
+				intGroup.POST("/codeforces/connect", integrationHandler.ConnectCodeforces)
 			}
+
 		}
 
 		if commitmentRepo != nil && evidenceRepo != nil && donationRepo != nil && verificationRepo != nil {
@@ -196,6 +208,113 @@ func (s *Server) setupRoutes() {
 				devGroup.POST("/force-failure", devHandler.ForceFailure)
 			}
 		}
+
+		if s.DB != nil {
+			s.seedAdminUser()
+			adminHandler := handlers.NewAdminHandler(s.DB, resolver, razorpayXClient)
+			adminGroup := v1.Group("/admin")
+			adminGroup.Use(middleware.AuthRequired(s.Config.JWTSecret))
+			{
+				adminGroup.GET("/stats", adminHandler.GetAdminStats)
+				adminGroup.GET("/transactions", adminHandler.GetAdminTransactions)
+				adminGroup.POST("/payout", adminHandler.ReleasePayout)
+			}
+		}
+	}
+}
+
+func (s *Server) seedAdminUser() {
+	if s.DB == nil {
+		return
+	}
+	var admin models.User
+	err := s.DB.Where("email = ?", "admin@admin.com").First(&admin).Error
+	hashedPass, _ := bcrypt.GenerateFromPassword([]byte("admin123"), bcrypt.DefaultCost)
+
+	if err != nil {
+		admin = models.User{
+			Email:        "admin@admin.com",
+			Name:         "System Admin",
+			PasswordHash: string(hashedPass),
+			Role:         "admin",
+		}
+		if cErr := s.DB.Create(&admin).Error; cErr == nil {
+			slog.Info("Admin user initialized", "email", "admin@admin.com")
+		}
+	} else {
+		s.DB.Model(&admin).Updates(map[string]interface{}{
+			"password_hash": string(hashedPass),
+			"role":          "admin",
+		})
+		slog.Info("Admin user credentials synced", "email", "admin@admin.com")
+	}
+}
+
+func (s *Server) StartSettlementWorker(ctx context.Context) {
+	if s.DB == nil || s.Resolver == nil {
+		return
+	}
+
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+
+		slog.Info("Automated Escrow Settlement Worker active (checks every 5s)")
+
+		for {
+			select {
+			case <-ctx.Done():
+				slog.Info("Settlement worker stopped")
+				return
+			case <-ticker.C:
+				s.settleExpiredCommitments(ctx)
+			}
+		}
+	}()
+}
+
+func (s *Server) settleExpiredCommitments(ctx context.Context) {
+	now := time.Now().UTC()
+	var expiredIDs []string
+	err := s.DB.WithContext(ctx).
+		Model(&models.Commitment{}).
+		Where("status = ? AND end_date <= ?", "ACTIVE", now).
+		Pluck("id", &expiredIDs).Error
+
+	if err != nil || len(expiredIDs) == 0 {
+		return
+	}
+
+	for _, id := range expiredIDs {
+		// Load the full commitment so we can sync evidence for it
+		var commitment models.Commitment
+		if err := s.DB.WithContext(ctx).Preload("User").First(&commitment, "id = ?", id).Error; err != nil {
+			slog.Error("Settlement worker: failed to load commitment", "commitment_id", id, "error", err)
+			continue
+		}
+
+		// Step 1: Auto-sync fresh evidence from CF or GitHub before evaluating
+		if s.EvidenceSyncer != nil {
+			slog.Info("Settlement worker: syncing evidence before resolution", "commitment_id", id, "evidence_type", commitment.EvidenceType)
+			if syncErr := s.EvidenceSyncer.SyncForCommitment(ctx, &commitment); syncErr != nil {
+				slog.Warn("Settlement worker: evidence sync failed (proceeding anyway)", "commitment_id", id, "error", syncErr)
+			}
+		}
+
+		// Step 2: Resolve — evaluate progress and dispatch payout or refund
+		slog.Info("Settlement worker: resolving commitment", "commitment_id", id)
+		res, rErr := s.Resolver.ResolveCommitment(ctx, id)
+		if rErr != nil {
+			slog.Error("Settlement worker: resolve failed", "commitment_id", id, "error", rErr)
+			continue
+		}
+		slog.Info("Settlement worker: commitment resolved",
+			"commitment_id", id,
+			"state", res.State,
+			"verified", res.Progress.Verified,
+			"target", res.Progress.Target,
+			"progress_pct", res.Progress.ProgressPct,
+		)
 	}
 }
 

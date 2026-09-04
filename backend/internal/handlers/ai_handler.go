@@ -30,11 +30,13 @@ type StructureGoalRequest struct {
 }
 
 type StructuredGoalResponse struct {
-	Goal     string `json:"goal"`
-	Target   int    `json:"target"`
-	Duration int    `json:"duration"`
-	Unit     string `json:"unit"`
-	Evidence string `json:"evidence"`
+	Goal            string `json:"goal"`
+	Target          int    `json:"target"`
+	Duration        int    `json:"duration"`
+	Unit            string `json:"unit"`
+	Evidence        string `json:"evidence"`
+	TimeframeText   string `json:"timeframe_text,omitempty"`
+	DurationMinutes int    `json:"duration_minutes,omitempty"`
 }
 
 type AnalyzeQualityRequest struct {
@@ -98,9 +100,9 @@ Output JSON matching this exact schema:
 {
   "goal": "string (concise title summarizing the milestone)",
   "target": integer (numerical target, default to 10 if unspecified),
-  "duration": integer (days duration, default to 7 if unspecified),
+  "duration": integer (duration in days: minimum 1 day. If the user specifies sub-day timeframes like minutes or hours, set duration to 1),
   "unit": "string (e.g. 'commits', 'problems', 'pull_requests', 'repositories')",
-  "evidence": "string (e.g. 'github_activity')"
+  "evidence": "string (e.g. 'codeforces_submissions' for DSA/problems, 'github_activity' for commits/PRs)"
 }`
 
 	userPrompt := fmt.Sprintf("User goal: %s", strings.TrimSpace(req.Text))
@@ -158,7 +160,13 @@ func (h *AIHandler) AnalyzeQuality(c *gin.Context) {
 	systemPrompt := `You are the Commitment Quality Analyzer AI for PledgePay.
 Evaluate the developer's commitment for specificity, measurability, realism, and automated verifiable evidence quality.
 Score each dimension from 0 to 100.
-If the overall score is below 80, provide a list of concrete issues and a concrete suggested_commitment rewrite.
+
+CRITICAL REALISM & TIMEFRAME RULES:
+1. Realism: If the timeframe is impossibly fast (e.g. solving a DSA problem in 1 minute or 5 minutes, shipping a full app in 1 hour), Realism MUST be scored between 10-25%, and Overall MUST be below 50. In issues, explain that authentic problem solving takes 20-45 minutes.
+2. Sub-day Minimum: PledgePay automated evidence verifications require a minimum duration of 1 day. If the user specifies minutes or hours, explain this in issues and provide a suggested_commitment with duration of at least 1 day.
+3. Excessive Pace: If the pace is impossible (e.g. 50 DSA problems in 1 day), Realism MUST be low (<30%).
+4. If the overall score is below 80, provide a list of concrete issues and a realistic suggested_commitment rewrite.
+
 Output JSON matching this exact schema:
 {
   "specificity": integer (0-100),
@@ -168,7 +176,7 @@ Output JSON matching this exact schema:
   "overall": integer (0-100),
   "issues": ["string array of concrete criticisms, empty if score >= 80"],
   "suggested_commitment": {
-    "goal": "string (clear, specific goal)",
+    "goal": "string (clear, realistic specific goal)",
     "target": integer,
     "duration": integer,
     "unit": "string",
@@ -328,7 +336,8 @@ func (h *AIHandler) AnalyzeCombined(c *gin.Context) {
 	g.Go(func() error {
 		systemPrompt := `You are the Goal Structurer AI for PledgePay.
 Turn the user's natural language goal into a structured schema with measurable parameters.
-Output JSON: {"goal": "string", "target": integer, "duration": integer, "unit": "string", "evidence": "string"}`
+Output JSON: {"goal": "string", "target": integer, "duration": integer, "unit": "string", "evidence": "string"}
+RULES: duration must be an integer in days (minimum 1 day). If user specifies minutes or hours, set duration to 1.`
 		userPrompt := fmt.Sprintf("Goal: %s", req.Text)
 		return h.groqClient.Complete(gCtx, systemPrompt, userPrompt, &structured)
 	})
@@ -336,6 +345,7 @@ Output JSON: {"goal": "string", "target": integer, "duration": integer, "unit": 
 	g.Go(func() error {
 		systemPrompt := `You are the Commitment Quality Analyzer AI for PledgePay.
 Evaluate the commitment for specificity, measurability, realism, and verifiable evidence.
+CRITICAL: If timeframe is impossibly fast (e.g. solving DSA in 1 minute, full app in 1 hour), Realism MUST be 10-25%, Overall < 50, and issues MUST flag this.
 Output JSON:
 {
   "specificity": integer (0-100), "measurability": integer (0-100), "realism": integer (0-100), "evidence": integer (0-100), "overall": integer (0-100),

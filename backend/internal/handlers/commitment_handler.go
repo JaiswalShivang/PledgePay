@@ -3,6 +3,9 @@ package handlers
 import (
 	"errors"
 	"net/http"
+	"regexp"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -82,6 +85,20 @@ func (h *CommitmentHandler) CreateCommitment(c *gin.Context) {
 
 	startDate := time.Now().UTC()
 	endDate := startDate.AddDate(0, 0, req.DurationDays)
+
+	lowerTitle := strings.ToLower(req.Title)
+	reMin := regexp.MustCompile(`(?i)(\d+)\s*(?:minutes?|mins?)\b`)
+	if m := reMin.FindStringSubmatch(lowerTitle); len(m) > 1 {
+		if n, err := strconv.Atoi(m[1]); err == nil && n > 0 {
+			endDate = startDate.Add(time.Duration(n) * time.Minute)
+		}
+	}
+	reHr := regexp.MustCompile(`(?i)(\d+)\s*(?:hours?|hrs?)\b`)
+	if m := reHr.FindStringSubmatch(lowerTitle); len(m) > 1 {
+		if n, err := strconv.Atoi(m[1]); err == nil && n > 0 {
+			endDate = startDate.Add(time.Duration(n) * time.Hour)
+		}
+	}
 
 	commitment := &models.Commitment{
 		UserID:       userID,

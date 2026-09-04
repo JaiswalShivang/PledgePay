@@ -9,6 +9,8 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -161,74 +163,334 @@ func (c *GroqClient) doChatRequest(ctx context.Context, messages []groqMessage) 
 	return strings.TrimSpace(rawContent), nil
 }
 
+type ParsedGoalParams struct {
+	Goal             string
+	Target           int
+	DurationDays     int
+	Unit             string
+	Evidence         string
+	RawDurationUnit  string
+	RawDurationValue int
+	TotalMinutes     int
+	TimeframeText    string
+}
+
+func extractGoalParameters(prompt string) ParsedGoalParams {
+	lower := strings.ToLower(prompt)
+	cleanPrompt := prompt
+	for _, prefix := range []string{"user goal:", "goal:", "text:"} {
+		if idx := strings.Index(strings.ToLower(cleanPrompt), prefix); idx != -1 {
+			cleanPrompt = strings.TrimSpace(cleanPrompt[idx+len(prefix):])
+		}
+	}
+	cleanPrompt = strings.TrimSpace(cleanPrompt)
+	if cleanPrompt == "" {
+		cleanPrompt = prompt
+	}
+
+	// 1. Determine Unit
+	unit := "commits"
+	if strings.Contains(lower, "dsa") || strings.Contains(lower, "problem") || strings.Contains(lower, "question") || strings.Contains(lower, "leetcode") || strings.Contains(lower, "codeforces") {
+		unit = "problems"
+	} else if strings.Contains(lower, "pr") || strings.Contains(lower, "pull request") {
+		unit = "pull_requests"
+	} else if strings.Contains(lower, "commit") {
+		unit = "commits"
+	} else if strings.Contains(lower, "repo") || strings.Contains(lower, "project") {
+		unit = "projects"
+	}
+
+	// 2. Determine Evidence
+	evidence := "github_activity"
+	if strings.Contains(lower, "codeforces") || strings.Contains(lower, "cf") || strings.Contains(lower, "dsa") || strings.Contains(lower, "leetcode") || unit == "problems" {
+		evidence = "codeforces_submissions"
+	}
+
+	// 3. Extract Target Number
+	target := 0
+	reAction := regexp.MustCompile(`(?i)(?:solve|complete|do|finish|merge|commit|ship)\s+(\d+)`)
+	if m := reAction.FindStringSubmatch(lower); len(m) > 1 {
+		if n, err := strconv.Atoi(m[1]); err == nil && n > 0 {
+			target = n
+		}
+	}
+	if target == 0 {
+		reQuantity := regexp.MustCompile(`(?i)(\d+)\s*(?:dsa|problems?|questions?|commits?|prs?|pull\s*requests?|contributions?|repos?|projects?)`)
+		if m := reQuantity.FindStringSubmatch(lower); len(m) > 1 {
+			if n, err := strconv.Atoi(m[1]); err == nil && n > 0 {
+				target = n
+			}
+		}
+	}
+	if target == 0 {
+		numWords := map[string]int{
+			"one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+			"six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+			"twenty": 20, "thirty": 30, "fifty": 50, "hundred": 100,
+		}
+		for word, val := range numWords {
+			if matched, _ := regexp.MatchString(`\b`+word+`\b`, lower); matched {
+				target = val
+				break
+			}
+		}
+	}
+	if target == 0 {
+		reAnyNum := regexp.MustCompile(`\b(\d+)\b`)
+		allNums := reAnyNum.FindAllString(lower, -1)
+		if len(allNums) > 0 {
+			if n, err := strconv.Atoi(allNums[0]); err == nil && n > 0 {
+				target = n
+			}
+		}
+	}
+	if target <= 0 {
+		if unit == "problems" {
+			target = 5
+		} else {
+			target = 10
+		}
+	}
+
+	// 4. Extract Duration (handle seconds, minutes, hours, days, weeks, months)
+	rawDurationUnit := "none"
+	rawDurationValue := 0
+	totalMinutes := 0
+	durationDays := 0
+
+	// Check seconds
+	reSec := regexp.MustCompile(`(?i)(\d+)\s*(?:seconds?|secs?|s)\b`)
+	if m := reSec.FindStringSubmatch(lower); len(m) > 1 {
+		if n, err := strconv.Atoi(m[1]); err == nil && n > 0 {
+			rawDurationUnit = "seconds"
+			rawDurationValue = n
+			totalMinutes = 0
+			durationDays = 1
+		}
+	}
+
+	// Check minutes (e.g. "1 minute", "in 1 next 1 minute", "10 mins")
+	if rawDurationUnit == "none" {
+		reMin := regexp.MustCompile(`(?i)(\d+)\s*(?:minutes?|mins?|m)\b`)
+		if m := reMin.FindStringSubmatch(lower); len(m) > 1 {
+			if n, err := strconv.Atoi(m[1]); err == nil && n > 0 {
+				rawDurationUnit = "minutes"
+				rawDurationValue = n
+				totalMinutes = n
+				durationDays = 1
+			}
+		}
+	}
+
+	// Check hours (e.g. "1 hour", "2 hrs")
+	if rawDurationUnit == "none" {
+		reHr := regexp.MustCompile(`(?i)(\d+)\s*(?:hours?|hrs?|h)\b`)
+		if m := reHr.FindStringSubmatch(lower); len(m) > 1 {
+			if n, err := strconv.Atoi(m[1]); err == nil && n > 0 {
+				rawDurationUnit = "hours"
+				rawDurationValue = n
+				totalMinutes = n * 60
+				durationDays = 1
+			}
+		}
+	}
+
+	// Check today / tonight / tomorrow
+	if rawDurationUnit == "none" {
+		if strings.Contains(lower, "today") || strings.Contains(lower, "tonight") {
+			rawDurationUnit = "days"
+			rawDurationValue = 1
+			totalMinutes = 1440
+			durationDays = 1
+		} else if strings.Contains(lower, "tomorrow") {
+			rawDurationUnit = "days"
+			rawDurationValue = 1
+			totalMinutes = 1440
+			durationDays = 1
+		}
+	}
+
+	// Check days
+	if rawDurationUnit == "none" {
+		reDays := regexp.MustCompile(`(?i)(\d+)\s*(?:consecutive\s*)?days?`)
+		if m := reDays.FindStringSubmatch(lower); len(m) > 1 {
+			if n, err := strconv.Atoi(m[1]); err == nil && n > 0 {
+				rawDurationUnit = "days"
+				rawDurationValue = n
+				totalMinutes = n * 1440
+				durationDays = n
+			}
+		}
+	}
+
+	// Check weeks
+	if rawDurationUnit == "none" {
+		reWeeks := regexp.MustCompile(`(?i)(\d+)\s*weeks?`)
+		if m := reWeeks.FindStringSubmatch(lower); len(m) > 1 {
+			if n, err := strconv.Atoi(m[1]); err == nil && n > 0 {
+				rawDurationUnit = "weeks"
+				rawDurationValue = n
+				totalMinutes = n * 7 * 1440
+				durationDays = n * 7
+			}
+		}
+	}
+
+	// Check months
+	if rawDurationUnit == "none" {
+		reMonths := regexp.MustCompile(`(?i)(\d+)\s*months?`)
+		if m := reMonths.FindStringSubmatch(lower); len(m) > 1 {
+			if n, err := strconv.Atoi(m[1]); err == nil && n > 0 {
+				rawDurationUnit = "months"
+				rawDurationValue = n
+				totalMinutes = n * 30 * 1440
+				durationDays = n * 30
+			}
+		}
+	}
+
+	if durationDays <= 0 {
+		durationDays = 7
+	}
+
+	timeframeText := ""
+	if rawDurationUnit == "minutes" {
+		if rawDurationValue == 1 {
+			timeframeText = "1 minute"
+		} else {
+			timeframeText = fmt.Sprintf("%d minutes", rawDurationValue)
+		}
+	} else if rawDurationUnit == "seconds" {
+		timeframeText = fmt.Sprintf("%d seconds", rawDurationValue)
+	} else if rawDurationUnit == "hours" {
+		if rawDurationValue == 1 {
+			timeframeText = "1 hour"
+		} else {
+			timeframeText = fmt.Sprintf("%d hours", rawDurationValue)
+		}
+	} else if rawDurationUnit == "days" {
+		if rawDurationValue == 1 {
+			timeframeText = "1 day"
+		} else {
+			timeframeText = fmt.Sprintf("%d days", rawDurationValue)
+		}
+	} else if rawDurationUnit == "weeks" {
+		if rawDurationValue == 1 {
+			timeframeText = "1 week"
+		} else {
+			timeframeText = fmt.Sprintf("%d weeks", rawDurationValue)
+		}
+	} else if rawDurationUnit == "months" {
+		if rawDurationValue == 1 {
+			timeframeText = "1 month"
+		} else {
+			timeframeText = fmt.Sprintf("%d months", rawDurationValue)
+		}
+	} else {
+		if durationDays == 1 {
+			timeframeText = "1 day"
+		} else {
+			timeframeText = fmt.Sprintf("%d days", durationDays)
+		}
+	}
+
+	return ParsedGoalParams{
+		Goal:             cleanPrompt,
+		Target:           target,
+		DurationDays:     durationDays,
+		Unit:             unit,
+		Evidence:         evidence,
+		RawDurationUnit:  rawDurationUnit,
+		RawDurationValue: rawDurationValue,
+		TotalMinutes:     totalMinutes,
+		TimeframeText:    timeframeText,
+	}
+}
+
 func (c *GroqClient) fallbackComplete(systemPrompt, userPrompt string, out any) error {
 	lower := strings.ToLower(userPrompt)
 
 	if strings.Contains(systemPrompt, "Goal Structurer") || strings.Contains(systemPrompt, "structure-goal") {
-		var target int = 10
-		var duration int = 7
-		var unit string = "commits"
-		var evidence string = "github_activity"
-
-		if strings.Contains(lower, "dsa") || strings.Contains(lower, "problem") || strings.Contains(lower, "leetcode") {
-			unit = "problems"
-			target = 20
-		} else if strings.Contains(lower, "pr") || strings.Contains(lower, "pull request") {
-			unit = "pull_requests"
-			target = 5
-		}
+		p := extractGoalParameters(userPrompt)
 
 		mock := map[string]interface{}{
-			"goal":     strings.TrimSpace(userPrompt),
-			"target":   target,
-			"duration": duration,
-			"unit":     unit,
-			"evidence": evidence,
+			"goal":             p.Goal,
+			"target":           p.Target,
+			"duration":         p.DurationDays,
+			"unit":             p.Unit,
+			"evidence":         p.Evidence,
+			"timeframe_text":   p.TimeframeText,
+			"duration_minutes": p.TotalMinutes,
 		}
 		raw, _ := json.Marshal(mock)
 		return json.Unmarshal(raw, out)
 	}
 
 	if strings.Contains(systemPrompt, "Quality Analyzer") || strings.Contains(systemPrompt, "analyze-quality") {
-		isVague := len(lower) < 25 || strings.Contains(lower, "good at") || strings.Contains(lower, "learn coding") || strings.Contains(lower, "better")
+		p := extractGoalParameters(userPrompt)
+
+		var specificity, measurability, realism, evidenceScore, overall int
+		var issues []string
+		suggestedGoal := p.Goal
+		suggestedTarget := p.Target
+		suggestedDuration := p.DurationDays
+		suggestedUnit := p.Unit
+		suggestedEvidence := p.Evidence
+
+		isVague := (len(lower) < 15 && p.Target <= 0) || strings.Contains(lower, "good at") || strings.Contains(lower, "better coder") || strings.Contains(lower, "become a developer") || (p.Target <= 0 && !strings.Contains(lower, "dsa") && !strings.Contains(lower, "commit"))
 
 		if isVague {
-			mock := map[string]interface{}{
-				"specificity":   32,
-				"measurability": 28,
-				"realism":       75,
-				"evidence":      35,
-				"overall":       42,
-				"issues": []string{
-					"Goal lacks concrete quantitative target (e.g. number of PRs or commits).",
-					"No explicit timeframe defined (e.g. 7 days or 14 days).",
-					"Objective criteria are not directly verifiable via GitHub evidence.",
-				},
-				"suggested_commitment": map[string]interface{}{
-					"goal":     "Merge 5 GitHub pull requests in 7 days",
-					"target":   5,
-					"duration": 7,
-					"unit":     "pull_requests",
-					"evidence": "github_activity",
-				},
+			specificity = 40
+			measurability = 35
+			realism = 70
+			evidenceScore = 40
+			overall = 46
+			issues = []string{
+				"Goal lacks a concrete quantitative target count.",
+				"No clear timeframe specified.",
+				"Verification criteria cannot be automatically polled.",
 			}
-			raw, _ := json.Marshal(mock)
-			return json.Unmarshal(raw, out)
+			suggestedGoal = fmt.Sprintf("Solve 5 %s in 7 days", p.Unit)
+			suggestedTarget = 5
+			suggestedDuration = 7
+		} else {
+			// Concrete goal with verifiable target!
+			// Format clean title for suggested rewrite if needed
+			if p.Unit == "problems" {
+				if p.DurationDays == 1 {
+					suggestedGoal = fmt.Sprintf("Solve %d DSA problem today", p.Target)
+				} else {
+					suggestedGoal = fmt.Sprintf("Solve %d DSA problems in %d days", p.Target, p.DurationDays)
+				}
+			} else if p.Unit == "pull_requests" {
+				suggestedGoal = fmt.Sprintf("Merge %d pull requests in %d days", p.Target, p.DurationDays)
+			} else {
+				suggestedGoal = fmt.Sprintf("Make %d verifiable commits in %d days", p.Target, p.DurationDays)
+			}
+
+			specificity = 92
+			measurability = 96
+			realism = 94
+			evidenceScore = 92
+			overall = 94
+			issues = []string{}
 		}
 
 		mock := map[string]interface{}{
-			"specificity":   92,
-			"measurability": 95,
-			"realism":       88,
-			"evidence":      91,
-			"overall":       91,
-			"issues":        []string{},
+			"specificity":   specificity,
+			"measurability": measurability,
+			"realism":       realism,
+			"evidence":      evidenceScore,
+			"overall":       overall,
+			"issues":        issues,
 			"suggested_commitment": map[string]interface{}{
-				"goal":     strings.TrimSpace(userPrompt),
-				"target":   15,
-				"duration": 7,
-				"unit":     "contributions",
-				"evidence": "github_activity",
+				"goal":             suggestedGoal,
+				"target":           suggestedTarget,
+				"duration":         suggestedDuration,
+				"unit":             suggestedUnit,
+				"evidence":         suggestedEvidence,
+				"timeframe_text":   p.TimeframeText,
+				"duration_minutes": p.TotalMinutes,
 			},
 		}
 		raw, _ := json.Marshal(mock)
@@ -260,6 +522,26 @@ func (c *GroqClient) fallbackComplete(systemPrompt, userPrompt string, out any) 
 
 		mock := map[string]interface{}{
 			"suggestions": suggestions,
+		}
+		raw, _ := json.Marshal(mock)
+		return json.Unmarshal(raw, out)
+	}
+
+	if strings.Contains(systemPrompt, "Commitment Coach") || strings.Contains(systemPrompt, "coach") {
+		mock := map[string]interface{}{
+			"reply": "Keep a steady cadence! Prioritize 1 focused problem per session, write out test cases first, and ensure each commit is verifiable.",
+		}
+		raw, _ := json.Marshal(mock)
+		return json.Unmarshal(raw, out)
+	}
+
+	if strings.Contains(systemPrompt, "Evidence Verifier") || strings.Contains(systemPrompt, "verify") {
+		mock := map[string]interface{}{
+			"evidence_quality": "HIGH",
+			"anomaly":          "NONE",
+			"anomaly_reason":   nil,
+			"confidence":       94.0,
+			"summary":          "Activity shows organic cadence and verifiable evidence.",
 		}
 		raw, _ := json.Marshal(mock)
 		return json.Unmarshal(raw, out)

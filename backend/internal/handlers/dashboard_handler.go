@@ -97,15 +97,13 @@ func (h *DashboardHandler) GetDashboard(c *gin.Context) {
 	var sumProgress float64 = 0.0
 
 	for _, item := range items {
-		totalPledged += item.Commitment.AmountPaise
 		if item.Commitment.Status == "ACTIVE" {
+			totalPledged += item.Commitment.AmountPaise
 			activeCount++
 		} else if item.Commitment.Status == "COMPLETED" {
 			completedCount++
-		}
-
-		if item.Donation != nil && item.Donation.Status == "PAID" {
-			totalDonated += item.Donation.AmountPaise
+		} else if item.Commitment.Status == "FAILED" {
+			totalDonated += item.Commitment.AmountPaise
 		}
 		sumProgress += item.Progress.ProgressPct
 	}

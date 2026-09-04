@@ -45,6 +45,7 @@ func main() {
 	}
 
 	srvInstance := server.New(cfg, gormDB, rdb)
+	srvInstance.StartSettlementWorker(rootCtx)
 
 	httpServer := &http.Server{
 		Addr:         fmt.Sprintf(":%s", cfg.Port),
