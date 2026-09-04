@@ -98,7 +98,7 @@ func (s *Server) setupRoutes() {
 	v1 := s.Router.Group("/api/v1")
 	{
 		if userRepo != nil {
-			authHandler := handlers.NewAuthHandler(s.Config, userRepo)
+			authHandler := handlers.NewAuthHandler(s.Config, userRepo, integrationRepo)
 			authGroup := v1.Group("/auth")
 			{
 				authGroup.POST("/register", authHandler.Register)

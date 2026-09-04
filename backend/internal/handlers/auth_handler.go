@@ -17,22 +17,29 @@ import (
 )
 
 type AuthHandler struct {
-	cfg      *config.Config
-	userRepo repository.UserRepository
+	cfg             *config.Config
+	userRepo        repository.UserRepository
+	integrationRepo repository.IntegrationRepository
 }
 
-func NewAuthHandler(cfg *config.Config, userRepo repository.UserRepository) *AuthHandler {
+func NewAuthHandler(cfg *config.Config, userRepo repository.UserRepository, integrationRepo ...repository.IntegrationRepository) *AuthHandler {
+	var intRepo repository.IntegrationRepository
+	if len(integrationRepo) > 0 {
+		intRepo = integrationRepo[0]
+	}
 	return &AuthHandler{
-		cfg:      cfg,
-		userRepo: userRepo,
+		cfg:             cfg,
+		userRepo:        userRepo,
+		integrationRepo: intRepo,
 	}
 }
 
 type RegisterRequest struct {
-	Email          string  `json:"email" binding:"required,email"`
-	Password       string  `json:"password" binding:"required,min=8"`
-	Name           string  `json:"name" binding:"required,min=2"`
-	GithubUsername *string `json:"github_username"`
+	Email              string  `json:"email" binding:"required,email"`
+	Password           string  `json:"password" binding:"required,min=8"`
+	Name               string  `json:"name" binding:"required,min=2"`
+	GithubUsername     *string `json:"github_username"`
+	CodeforcesUsername *string `json:"codeforces_username"`
 }
 
 type LoginRequest struct {
@@ -104,13 +111,14 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	now := time.Now().UTC()
 	user := &models.User{
-		ID:             uuid.New().String(),
-		Email:          req.Email,
-		PasswordHash:   string(hashedPassword),
-		Name:           req.Name,
-		GithubUsername: req.GithubUsername,
-		CreatedAt:      now,
-		UpdatedAt:      now,
+		ID:                 uuid.New().String(),
+		Email:              req.Email,
+		PasswordHash:       string(hashedPassword),
+		Name:               req.Name,
+		GithubUsername:     req.GithubUsername,
+		CodeforcesUsername: req.CodeforcesUsername,
+		CreatedAt:          now,
+		UpdatedAt:          now,
 	}
 
 	if err := h.userRepo.Create(c.Request.Context(), user); err != nil {
@@ -120,6 +128,23 @@ func (h *AuthHandler) Register(c *gin.Context) {
 			"message": "failed to create user account: " + err.Error(),
 		})
 		return
+	}
+
+	if h.integrationRepo != nil {
+		if req.CodeforcesUsername != nil && *req.CodeforcesUsername != "" {
+			_ = h.integrationRepo.Upsert(c.Request.Context(), &models.Integration{
+				UserID:           user.ID,
+				Provider:         "codeforces",
+				ExternalUsername: req.CodeforcesUsername,
+			})
+		}
+		if req.GithubUsername != nil && *req.GithubUsername != "" {
+			_ = h.integrationRepo.Upsert(c.Request.Context(), &models.Integration{
+				UserID:           user.ID,
+				Provider:         "github",
+				ExternalUsername: req.GithubUsername,
+			})
+		}
 	}
 
 	tokenDuration := 7 * 24 * time.Hour

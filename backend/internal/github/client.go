@@ -151,7 +151,8 @@ func (c *GitHubClient) FetchCommits(ctx context.Context, token, repo string, sin
 		opt = opts[0]
 	}
 
-	fetchURL := fmt.Sprintf("https://api.github.com/repos/%s/commits?since=%s&per_page=50", repo, since.Format(time.RFC3339))
+	fetchSince := since.Add(-1 * time.Minute)
+	fetchURL := fmt.Sprintf("https://api.github.com/repos/%s/commits?since=%s&per_page=50", repo, fetchSince.Format(time.RFC3339))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fetchURL, nil)
 	if err != nil {
 		return nil, err
@@ -176,8 +177,9 @@ func (c *GitHubClient) FetchCommits(ctx context.Context, token, repo string, sin
 		Commit struct {
 			Message string `json:"message"`
 			Author  struct {
-				Name string    `json:"name"`
-				Date time.Time `json:"date"`
+				Name  string    `json:"name"`
+				Email string    `json:"email"`
+				Date  time.Time `json:"date"`
 			} `json:"author"`
 		} `json:"commit"`
 		Author struct {
@@ -201,11 +203,21 @@ func (c *GitHubClient) FetchCommits(ctx context.Context, token, repo string, sin
 			occurredAt = time.Now().UTC()
 		}
 
-		if !opt.Until.IsZero() && occurredAt.After(opt.Until) {
+		if !opt.Until.IsZero() && occurredAt.After(opt.Until.Add(30*time.Second)) {
 			continue
 		}
-		if opt.AuthorLogin != "" && !strings.EqualFold(authorName, opt.AuthorLogin) {
-			continue
+		if opt.AuthorLogin != "" {
+			cleanAuthor := strings.TrimSpace(opt.AuthorLogin)
+			authorMatches := strings.EqualFold(item.Author.Login, cleanAuthor) ||
+				strings.EqualFold(item.Commit.Author.Name, cleanAuthor) ||
+				strings.Contains(strings.ToLower(item.Commit.Author.Name), strings.ToLower(cleanAuthor)) ||
+				strings.Contains(strings.ToLower(cleanAuthor), strings.ToLower(item.Commit.Author.Name))
+			if strings.HasPrefix(strings.ToLower(repo), strings.ToLower(cleanAuthor)+"/") {
+				authorMatches = true
+			}
+			if !authorMatches {
+				continue
+			}
 		}
 
 		items = append(items, models.Evidence{
