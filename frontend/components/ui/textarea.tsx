@@ -9,11 +9,12 @@ export interface TextareaProps
 const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
   ({ className, error, disabled, ...props }, ref) => {
     return (
-      <div className="w-full">
+      <div className="w-full space-y-1">
         <textarea
           className={cn(
-            "flex min-h-[80px] w-full rounded-[8px] bg-white border border-[#D1D5DB] p-3 text-sm text-[#18181B] placeholder:text-[#9CA3AF] transition-colors focus-visible:outline-none focus-visible:border-[#047857] focus-visible:ring-1 focus-visible:ring-[#047857] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:opacity-75 resize-y",
-            error && "border-red-500 focus-visible:border-red-500 focus-visible:ring-red-500",
+            "flex min-h-[100px] w-full rounded-[12px] bg-white border border-[#D8DBE0] p-3.5 text-[14px] font-body text-[#16161A] placeholder:text-[#16161A]/40 transition-colors outline-none",
+            "focus:border-[#3D5AFE] focus:ring-1 focus:ring-[#3D5AFE] disabled:cursor-not-allowed disabled:bg-[#F2F3F7] disabled:opacity-60 resize-y",
+            error && "border-[#FF3D71] focus:border-[#FF3D71] focus:ring-[#FF3D71]",
             className
           )}
           ref={ref}
@@ -21,7 +22,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           {...props}
         />
         {error && (
-          <p className="mt-1 text-xs text-red-600">{error}</p>
+          <p className="text-[14px] text-[#FF3D71] font-body">{error}</p>
         )}
       </div>
     );

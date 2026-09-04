@@ -29,13 +29,11 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-      {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/40 transition-opacity"
+        className="fixed inset-0 bg-[#16161A]/60"
         onClick={() => onOpenChange(false)}
       />
-      {/* Container */}
-      <div className="relative z-50 w-full max-w-lg overflow-hidden rounded-[8px] bg-white border border-[#E4E7EB] p-6 shadow-lg">
+      <div className="relative z-50 w-full max-w-lg rounded-[12px] bg-white border border-[#F2F3F7] p-6">
         {children}
       </div>
     </div>
@@ -48,7 +46,7 @@ export function DialogHeader({
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("flex flex-col space-y-1 text-left pb-3 border-b border-[#E4E7EB]", className)}
+      className={cn("flex flex-col space-y-1.5 pb-4 border-b border-[#F2F3F7]", className)}
       {...props}
     />
   );
@@ -60,7 +58,7 @@ export function DialogTitle({
 }: React.HTMLAttributes<HTMLHeadingElement>) {
   return (
     <h3
-      className={cn("text-base font-semibold text-[#18181B] tracking-tight", className)}
+      className={cn("text-[20px] font-bold text-[#16161A] font-display", className)}
       {...props}
     />
   );
@@ -72,7 +70,7 @@ export function DialogDescription({
 }: React.HTMLAttributes<HTMLParagraphElement>) {
   return (
     <p
-      className={cn("text-xs text-[#52525B]", className)}
+      className={cn("text-[14px] text-[#16161A]/70 font-body", className)}
       {...props}
     />
   );
@@ -85,7 +83,7 @@ export function DialogFooter({
   return (
     <div
       className={cn(
-        "flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-3 border-t border-[#E4E7EB] mt-4",
+        "flex flex-col-reverse sm:flex-row sm:justify-end gap-2.5 pt-4 border-t border-[#F2F3F7] mt-6",
         className
       )}
       {...props}
@@ -104,7 +102,7 @@ export function DialogCloseButton({
     <button
       onClick={onClose}
       className={cn(
-        "absolute right-4 top-4 rounded-[4px] p-1 text-[#71717A] hover:text-[#18181B] hover:bg-[#F1F3F5] transition-colors focus-visible:outline-none",
+        "absolute right-4 top-4 rounded-[12px] p-2 text-[#16161A]/60 hover:text-[#16161A] hover:bg-[#F2F3F7] transition-colors focus-visible:outline-none",
         className
       )}
     >

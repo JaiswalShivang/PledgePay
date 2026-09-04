@@ -4,44 +4,41 @@ import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  [
-    "inline-flex items-center justify-center font-medium transition-all duration-150",
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
-    "disabled:pointer-events-none disabled:opacity-50 select-none",
-    "font-body",
-  ].join(" "),
+  "inline-flex items-center justify-center font-medium transition-colors select-none rounded-[12px] font-body disabled:pointer-events-none disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1",
   {
     variants: {
       variant: {
-        escrow:
-          "bg-[#0A6640] text-white hover:bg-[#085535] active:bg-[#064426] focus-visible:ring-[#0A6640]",
         primary:
-          "bg-[#0A6640] text-white hover:bg-[#085535] active:bg-[#064426] focus-visible:ring-[#0A6640]",
-        verifying:
-          "bg-[#1E4FD8] text-white hover:bg-[#1842B8] active:bg-[#1438A0] focus-visible:ring-[#1E4FD8]",
+          "bg-[#3D5AFE] text-white hover:bg-[#3249cb] focus-visible:ring-[#3D5AFE]",
+        escrow:
+          "bg-[#FF6B35] text-white hover:bg-[#e05622] focus-visible:ring-[#FF6B35]",
+        stake:
+          "bg-[#FF6B35] text-white hover:bg-[#e05622] focus-visible:ring-[#FF6B35]",
+        verified:
+          "bg-[#00C896] text-white hover:bg-[#00af83] focus-visible:ring-[#00C896]",
+        charity:
+          "bg-[#FF3D71] text-white hover:bg-[#e6295d] focus-visible:ring-[#FF3D71]",
         impact:
-          "bg-[#C44B0A] text-white hover:bg-[#A33D08] active:bg-[#8A3307] focus-visible:ring-[#C44B0A]",
+          "bg-[#FF3D71] text-white hover:bg-[#e6295d] focus-visible:ring-[#FF3D71]",
         secondary:
-          "bg-white text-[#111318] border border-[#D8DBE0] hover:bg-[#F5F6F8] hover:border-[#B0B7C3] focus-visible:ring-[#0A6640]",
+          "bg-[#F2F3F7] text-[#16161A] hover:bg-[#e5e7ee] focus-visible:ring-[#16161A]",
         outline:
-          "bg-transparent text-[#111318] border border-[#D8DBE0] hover:bg-[#F5F6F8] focus-visible:ring-[#0A6640]",
+          "bg-white text-[#16161A] border border-[#F2F3F7] hover:bg-[#F2F3F7] focus-visible:ring-[#3D5AFE]",
         ghost:
-          "bg-transparent text-[#4B5263] hover:bg-[#ECEEF1] hover:text-[#111318] focus-visible:ring-[#0A6640]",
+          "bg-transparent text-[#16161A] hover:bg-[#F2F3F7] focus-visible:ring-[#3D5AFE]",
         "ghost-dark":
-          "bg-transparent text-[rgba(255,255,255,0.7)] hover:bg-[rgba(255,255,255,0.08)] hover:text-white focus-visible:ring-white",
+          "bg-transparent text-white hover:bg-white/10 focus-visible:ring-white",
         destructive:
-          "bg-[#FEF2F2] text-[#B91C1C] border border-[#FECACA] hover:bg-[#FEE2E2] focus-visible:ring-[#B91C1C]",
+          "bg-[#FF3D71] text-white hover:bg-[#e6295d] focus-visible:ring-[#FF3D71]",
         link:
-          "text-[#0A6640] underline-offset-4 hover:underline p-0 h-auto bg-transparent focus-visible:ring-[#0A6640]",
+          "bg-transparent text-[#3D5AFE] hover:underline p-0 h-auto rounded-none focus-visible:ring-[#3D5AFE]",
       },
       size: {
-        xs: "h-6 px-2 text-[11px] rounded-[4px] gap-1",
-        sm: "h-8 px-3 text-xs rounded-[6px] gap-1.5",
-        md: "h-9 px-4 text-sm rounded-[8px] gap-2",
-        lg: "h-11 px-5 text-sm rounded-[10px] gap-2",
-        xl: "h-13 px-7 text-base rounded-[10px] gap-2.5",
-        icon: "h-8 w-8 p-0 rounded-[6px]",
-        "icon-sm": "h-7 w-7 p-0 rounded-[6px]",
+        sm: "h-8 px-3 text-[14px] gap-1.5",
+        md: "h-10 px-4 text-[14px] gap-2",
+        lg: "h-12 px-6 text-[16px] gap-2.5",
+        icon: "h-10 w-10 p-0",
+        "icon-sm": "h-8 w-8 p-0",
       },
     },
     defaultVariants: {
@@ -53,7 +50,7 @@ const buttonVariants = cva(
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-  VariantProps<typeof buttonVariants> {
+    VariantProps<typeof buttonVariants> {
   isLoading?: boolean;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;

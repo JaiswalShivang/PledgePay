@@ -1,19 +1,14 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-// ── Tabs — underline-indicator style (not background pill) ───────────────────
-// Supports light (default) and dark surface variants
-
 interface TabsContextValue {
   value: string;
   onValueChange: (value: string) => void;
-  surface?: "light" | "dark";
 }
 
 const TabsContext = React.createContext<TabsContextValue>({
   value: "",
   onValueChange: () => {},
-  surface: "light",
 });
 
 interface TabsProps {
@@ -22,7 +17,6 @@ interface TabsProps {
   onValueChange?: (value: string) => void;
   children: React.ReactNode;
   className?: string;
-  surface?: "light" | "dark";
 }
 
 function Tabs({
@@ -31,7 +25,6 @@ function Tabs({
   onValueChange,
   children,
   className,
-  surface = "light",
 }: TabsProps) {
   const [internalValue, setInternalValue] = React.useState(defaultValue);
   const value = controlledValue ?? internalValue;
@@ -42,23 +35,17 @@ function Tabs({
   };
 
   return (
-    <TabsContext.Provider value={{ value, onValueChange: handleChange, surface }}>
+    <TabsContext.Provider value={{ value, onValueChange: handleChange }}>
       <div className={cn("w-full", className)}>{children}</div>
     </TabsContext.Provider>
   );
 }
 
 function TabsList({ children, className }: { children: React.ReactNode; className?: string }) {
-  const { surface } = React.useContext(TabsContext);
-  const isDark = surface === "dark";
-
   return (
     <div
       className={cn(
-        "flex items-center gap-0",
-        isDark
-          ? "border-b border-[rgba(255,255,255,0.1)]"
-          : "border-b border-[#E8EAED]",
+        "flex items-center gap-1.5 p-1 bg-[#F2F3F7] rounded-[12px]",
         className
       )}
     >
@@ -67,60 +54,51 @@ function TabsList({ children, className }: { children: React.ReactNode; classNam
   );
 }
 
-function TabsTrigger({
-  value,
-  children,
-  className,
-}: {
+interface TabsTriggerProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   value: string;
   children: React.ReactNode;
   className?: string;
-}) {
-  const ctx = React.useContext(TabsContext);
-  const isActive = ctx.value === value;
-  const isDark = ctx.surface === "dark";
+}
+
+function TabsTrigger({ value: triggerValue, children, className, ...props }: TabsTriggerProps) {
+  const { value, onValueChange } = React.useContext(TabsContext);
+  const isActive = value === triggerValue;
 
   return (
     <button
       type="button"
       role="tab"
       aria-selected={isActive}
-      onClick={() => ctx.onValueChange(value)}
+      onClick={() => onValueChange(triggerValue)}
       className={cn(
-        "relative px-4 py-2.5 text-xs font-medium transition-colors duration-150 outline-none",
-        "focus-visible:ring-2 focus-visible:ring-[#0A6640] focus-visible:ring-inset",
-        "after:absolute after:bottom-[-1px] after:left-0 after:right-0 after:h-[2px] after:rounded-full after:transition-all after:duration-150",
+        "flex items-center justify-center gap-1.5 px-4 py-2 text-[14px] font-medium font-body rounded-[12px] transition-colors outline-none",
         isActive
-          ? [
-              isDark
-                ? "text-white after:bg-[#0A6640]"
-                : "text-[#111318] after:bg-[#0A6640]",
-            ].join(" ")
-          : [
-              isDark
-                ? "text-[rgba(255,255,255,0.5)] hover:text-[rgba(255,255,255,0.8)] after:bg-transparent"
-                : "text-[#6B7485] hover:text-[#111318] after:bg-transparent",
-            ].join(" "),
+          ? "bg-[#3D5AFE] text-white"
+          : "text-[#16161A]/70 hover:text-[#16161A] hover:bg-white/50",
         className
       )}
+      {...props}
     >
       {children}
     </button>
   );
 }
 
-function TabsContent({
-  value,
-  children,
-  className,
-}: {
+interface TabsContentProps {
   value: string;
   children: React.ReactNode;
   className?: string;
-}) {
-  const ctx = React.useContext(TabsContext);
-  if (ctx.value !== value) return null;
-  return <div className={cn("pt-4", className)}>{children}</div>;
+}
+
+function TabsContent({ value: contentValue, children, className }: TabsContentProps) {
+  const { value } = React.useContext(TabsContext);
+  if (value !== contentValue) return null;
+
+  return (
+    <div role="tabpanel" className={cn("pt-4", className)}>
+      {children}
+    </div>
+  );
 }
 
 export { Tabs, TabsList, TabsTrigger, TabsContent };
