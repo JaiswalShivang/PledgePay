@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
+import { Space_Grotesk, Inter } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { Providers } from "@/components/providers";
@@ -15,14 +15,7 @@ const spaceGrotesk = Space_Grotesk({
 const inter = Inter({
   variable: "--font-body",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  display: "swap",
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-data",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "500", "600", "700"],
   display: "swap",
 });
 
@@ -40,16 +33,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${spaceGrotesk.variable} ${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      className={`${spaceGrotesk.variable} ${inter.variable} h-full antialiased`}
     >
-      <body
-        className="min-h-full flex flex-col"
-        style={{
-          backgroundColor: "var(--canvas-fog)",
-          color: "var(--ink-primary)",
-          fontFamily: "var(--font-body), Inter, sans-serif",
-        }}
-      >
+      <body className="min-h-full flex flex-col bg-white text-[#16161A] font-body">
         <Script
           src="https://checkout.razorpay.com/v1/checkout.js"
           strategy="beforeInteractive"
@@ -57,18 +43,20 @@ export default function RootLayout({
         <Providers>
           <Navbar />
           <main className="flex-1 flex flex-col">{children}</main>
-          <footer
-            style={{
-              borderTop: "1px solid var(--border-subtle)",
-              backgroundColor: "var(--canvas-dark)",
-              color: "var(--ink-inverse-muted)",
-              padding: "20px 16px",
-              textAlign: "center",
-              fontSize: "12px",
-              fontFamily: "var(--font-data)",
-            }}
-          >
-            PledgePay &copy; 2026 &bull; Proof-of-Commitment Escrow Protocol
+          <footer className="bg-white border-t border-[#F2F3F7] py-8 px-4 sm:px-6">
+            <div className="container mx-auto max-w-6xl flex flex-col sm:flex-row items-center justify-between gap-4 text-[14px] text-[#16161A]/60 font-body">
+              <div className="flex items-center gap-2">
+                <span className="font-display font-bold text-[16px] text-[#16161A]">PledgePay</span>
+                <span className="text-[#16161A]/30">&bull;</span>
+                <span>Proof-of-Commitment Escrow Protocol</span>
+              </div>
+              <div className="flex items-center gap-2 text-[14px]">
+                <span className="h-2 w-2 rounded-full bg-[#00C896] inline-block" />
+                <span>Protocol Active</span>
+                <span className="text-[#16161A]/30">&bull;</span>
+                <span>&copy; 2026 PledgePay</span>
+              </div>
+            </div>
           </footer>
         </Providers>
       </body>
