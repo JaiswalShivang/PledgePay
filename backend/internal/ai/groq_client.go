@@ -29,7 +29,10 @@ func NewGroqClient(apiKey, model string) *GroqClient {
 		apiKey: apiKey,
 		model:  model,
 		httpClient: &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: 15 * time.Second,
+			Transport: &http.Transport{
+				DisableKeepAlives: true,
+			},
 		},
 	}
 }
@@ -190,9 +193,7 @@ func extractGoalParameters(prompt string) ParsedGoalParams {
 
 	// 1. Determine Unit
 	unit := "commits"
-	if strings.Contains(lower, "page") || strings.Contains(lower, "write") || strings.Contains(lower, "essay") || strings.Contains(lower, "chapter") || strings.Contains(lower, "notes") || strings.Contains(lower, "handwriting") || strings.Contains(lower, "book") || strings.Contains(lower, "pdf") {
-		unit = "pages"
-	} else if strings.Contains(lower, "dsa") || strings.Contains(lower, "problem") || strings.Contains(lower, "question") || strings.Contains(lower, "leetcode") || strings.Contains(lower, "codeforces") {
+	if strings.Contains(lower, "dsa") || strings.Contains(lower, "problem") || strings.Contains(lower, "question") || strings.Contains(lower, "leetcode") || strings.Contains(lower, "codeforces") {
 		unit = "problems"
 	} else if strings.Contains(lower, "pr") || strings.Contains(lower, "pull request") {
 		unit = "pull_requests"
@@ -204,9 +205,7 @@ func extractGoalParameters(prompt string) ParsedGoalParams {
 
 	// 2. Determine Evidence
 	evidence := "github_activity"
-	if unit == "pages" || strings.Contains(lower, "document") || strings.Contains(lower, "handwriting") || strings.Contains(lower, "ocr") || strings.Contains(lower, "pdf") {
-		evidence = "document_proof"
-	} else if strings.Contains(lower, "codeforces") || strings.Contains(lower, "cf") || strings.Contains(lower, "dsa") || strings.Contains(lower, "leetcode") || unit == "problems" {
+	if strings.Contains(lower, "codeforces") || strings.Contains(lower, "cf") || strings.Contains(lower, "dsa") || strings.Contains(lower, "leetcode") || unit == "problems" {
 		evidence = "codeforces_submissions"
 	}
 
@@ -400,31 +399,8 @@ func extractGoalParameters(prompt string) ParsedGoalParams {
 		}
 	}
 
-	goalTitle := cleanPrompt
-	if unit == "pages" || evidence == "document_proof" {
-		topic := "Notes"
-		if strings.Contains(lower, "html") || strings.Contains(lower, "hrml") {
-			topic = "HTML Notes"
-		} else if strings.Contains(lower, "css") {
-			topic = "CSS Notes"
-		} else if strings.Contains(lower, "javascript") || strings.Contains(lower, "js") {
-			topic = "JavaScript Notes"
-		} else if strings.Contains(lower, "react") {
-			topic = "React Notes"
-		} else if strings.Contains(lower, "dsa") {
-			topic = "DSA Notes"
-		} else if strings.Contains(lower, "python") {
-			topic = "Python Notes"
-		}
-		if timeframeText != "" {
-			goalTitle = fmt.Sprintf("Complete %s & Upload Document Proof (in %s)", topic, timeframeText)
-		} else {
-			goalTitle = fmt.Sprintf("Complete %s & Upload Document Proof", topic)
-		}
-	}
-
 	return ParsedGoalParams{
-		Goal:             goalTitle,
+		Goal:             cleanPrompt,
 		Target:           target,
 		DurationDays:     durationDays,
 		Unit:             unit,
@@ -466,7 +442,7 @@ func (c *GroqClient) fallbackComplete(systemPrompt, userPrompt string, out any) 
 		suggestedUnit := p.Unit
 		suggestedEvidence := p.Evidence
 
-		isVague := (len(lower) < 15 && p.Target <= 0) || strings.Contains(lower, "good at") || strings.Contains(lower, "better coder") || strings.Contains(lower, "become a developer") || (p.Target <= 0 && !strings.Contains(lower, "dsa") && !strings.Contains(lower, "commit") && !strings.Contains(lower, "note") && !strings.Contains(lower, "page"))
+		isVague := (len(lower) < 15 && p.Target <= 0) || strings.Contains(lower, "good at") || strings.Contains(lower, "better coder") || strings.Contains(lower, "become a developer") || (p.Target <= 0 && !strings.Contains(lower, "dsa") && !strings.Contains(lower, "commit"))
 
 		if isVague {
 			specificity = 40
@@ -492,12 +468,6 @@ func (c *GroqClient) fallbackComplete(systemPrompt, userPrompt string, out any) 
 				}
 			} else if p.Unit == "pull_requests" {
 				suggestedGoal = fmt.Sprintf("Merge %d pull requests in %d days", p.Target, p.DurationDays)
-			} else if p.Unit == "pages" || p.Evidence == "document_proof" {
-				tf := p.TimeframeText
-				if tf == "" {
-					tf = fmt.Sprintf("%d days", p.DurationDays)
-				}
-				suggestedGoal = fmt.Sprintf("Complete and upload %d pages of notes in %s", p.Target, tf)
 			} else {
 				suggestedGoal = fmt.Sprintf("Make %d verifiable commits in %d days", p.Target, p.DurationDays)
 			}
@@ -581,300 +551,6 @@ func (c *GroqClient) fallbackComplete(systemPrompt, userPrompt string, out any) 
 		return json.Unmarshal(raw, out)
 	}
 
-	if strings.Contains(systemPrompt, "Document Proof Auditor") || strings.Contains(systemPrompt, "document") {
-		var goalTitle, goalDesc, extractedText string
-		var targetPages int = 1
-
-		lines := strings.Split(userPrompt, "\n")
-		for i, line := range lines {
-			if strings.HasPrefix(line, "Goal Title: ") {
-				goalTitle = strings.TrimPrefix(line, "Goal Title: ")
-			} else if strings.HasPrefix(line, "Goal Description: ") {
-				goalDesc = strings.TrimPrefix(line, "Goal Description: ")
-			} else if strings.HasPrefix(line, "Target Pages: ") {
-				fmt.Sscanf(strings.TrimPrefix(line, "Target Pages: "), "%d", &targetPages)
-			} else if strings.HasPrefix(line, "Extracted Document Text (Sample):") {
-				extractedText = strings.Join(lines[i+1:], "\n")
-				break
-			}
-		}
-
-		auditRes := AuditDocumentContentFallback(goalTitle, goalDesc, targetPages, extractedText)
-		raw, _ := json.Marshal(auditRes)
-		return json.Unmarshal(raw, out)
-	}
 
 	return errors.New("unsupported prompt type for fallback completion")
-}
-
-func truncateText(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen] + "... [truncated]"
-}
-
-type DocumentVerificationResult struct {
-	IsRelevant       bool    `json:"is_relevant"`
-	RelevanceScore   float64 `json:"relevance_score"`
-	IsSubstantial    bool    `json:"is_substantial"`
-	SatisfiesGoal    bool    `json:"satisfies_goal"`
-	ConfidenceRating string  `json:"confidence_rating"`
-	Reasoning        string  `json:"reasoning"`
-	DetectedTopic    string  `json:"detected_topic"`
-}
-
-type topicDef struct {
-	id       string
-	name     string
-	keywords []string
-}
-
-var knownDocumentTopics = []topicDef{
-	{
-		id:   "css",
-		name: "CSS & Web Styling",
-		keywords: []string{
-			"css", "style", "styles", "styling", "selector", "selectors", "flexbox", "flex-direction",
-			"justify-content", "align-items", "grid", "grid-template", "padding", "margin", "border",
-			"color", "background", "display", "position", "relative", "absolute", "fixed", "sticky",
-			"pseudo", "hover", "focus", "keyframes", "animation", "media query", "responsive",
-			"box-sizing", "cascade", "cascading", "tailwind", "specificity", "font-family", "z-index",
-			"rem", "em", "vw", "vh", "overflow", "transform", "transition",
-		},
-	},
-	{
-		id:   "html",
-		name: "HTML & Web Structure",
-		keywords: []string{
-			"html", "doctype", "tag", "tags", "element", "elements", "head", "body", "div", "span",
-			"heading", "paragraph", "anchor", "href", "table", "tbody", "thead", "form", "input",
-			"label", "button", "textarea", "semantic", "dom", "iframe", "section", "article",
-			"nav", "footer", "header", "main", "canvas", "meta charset",
-		},
-	},
-	{
-		id:   "git",
-		name: "Git & Version Control",
-		keywords: []string{
-			"git", "commit", "commits", "branch", "branches", "merge", "merging", "push", "pull",
-			"checkout", "rebase", "stash", "clone", "github", "gitlab", "vcs", "version control",
-			"origin", "remote", "diff", "working directory", "staging", "index", "conflict",
-			"fast-forward", "cherry-pick", "repository", "git log", "git status", "pull request",
-		},
-	},
-	{
-		id:   "javascript",
-		name: "JavaScript & Frontend",
-		keywords: []string{
-			"javascript", "typescript", "js", "ts", "const", "let", "var", "function", "functions",
-			"arrow function", "promise", "promises", "async", "await", "callback", "array",
-			"object", "react", "hooks", "usestate", "useeffect", "node", "npm", "closure",
-			"prototype", "event listener", "console.log", "json", "dom manipulation",
-		},
-	},
-	{
-		id:   "python",
-		name: "Python Programming",
-		keywords: []string{
-			"python", "def ", "pip", "django", "flask", "numpy", "pandas", "tuple", "dictionary",
-			"dict", "indentation", "lambda", "list comprehension", "generator", "decorator",
-			"__init__", "self", "import ", "elif", "pytest",
-		},
-	},
-	{
-		id:   "dsa",
-		name: "DSA & Algorithms",
-		keywords: []string{
-			"dsa", "data structure", "data structures", "algorithm", "algorithms", "array",
-			"linked list", "stack", "stacks", "queue", "queues", "tree", "trees", "binary search",
-			"graph", "graphs", "bfs", "dfs", "dynamic programming", "recursion", "sorting",
-			"merge sort", "quick sort", "hashmap", "leetcode", "codeforces", "time complexity",
-			"big o", "space complexity", "pointer",
-		},
-	},
-	{
-		id:   "sql",
-		name: "SQL & Databases",
-		keywords: []string{
-			"sql", "database", "databases", "query", "queries", "select", "insert", "update",
-			"delete", "from", "where", "join", "joins", "inner join", "outer join", "table",
-			"postgres", "postgresql", "mysql", "sqlite", "primary key", "foreign key", "schema",
-			"normalization", "index", "group by", "order by", "acid",
-		},
-	},
-	{
-		id:   "docker",
-		name: "DevOps & Containers",
-		keywords: []string{
-			"docker", "container", "containers", "dockerfile", "image", "compose", "kubernetes",
-			"k8s", "pod", "deployment", "volume", "port forwarding", "ci/cd", "pipeline", "devops",
-		},
-	},
-}
-
-func AuditDocumentContentFallback(goalTitle, goalDesc string, targetPages int, extractedText string) DocumentVerificationResult {
-	textLower := strings.ToLower(extractedText)
-	goalCombined := strings.ToLower(goalTitle + " " + goalDesc)
-	words := strings.Fields(extractedText)
-	totalWords := len(words)
-
-	minWordsRequired := targetPages * 10
-	if minWordsRequired < 10 {
-		minWordsRequired = 10
-	}
-
-	if totalWords < 5 {
-		return DocumentVerificationResult{
-			IsRelevant:       false,
-			RelevanceScore:   0,
-			IsSubstantial:    false,
-			SatisfiesGoal:    false,
-			ConfidenceRating: "HIGH",
-			Reasoning:        "Uploaded document is empty or contains virtually no readable text.",
-			DetectedTopic:    "Empty / Unreadable",
-		}
-	}
-
-	// 1. Identify which topics are explicitly mentioned in the user's goal
-	var matchedGoalTopics []topicDef
-	for _, topic := range knownDocumentTopics {
-		if strings.Contains(goalCombined, topic.id) || strings.Contains(goalCombined, strings.ToLower(topic.name)) {
-			matchedGoalTopics = append(matchedGoalTopics, topic)
-		}
-	}
-
-	// 2. Count topic keyword hits in extracted document text
-	topicHits := make(map[string]int)
-	for _, topic := range knownDocumentTopics {
-		count := 0
-		for _, kw := range topic.keywords {
-			if strings.Contains(textLower, strings.ToLower(kw)) {
-				count++
-			}
-		}
-		topicHits[topic.id] = count
-	}
-
-	// Find dominant topic in extracted text
-	var topDocTopic topicDef
-	maxHits := 0
-	for _, topic := range knownDocumentTopics {
-		if topicHits[topic.id] > maxHits {
-			maxHits = topicHits[topic.id]
-			topDocTopic = topic
-		}
-	}
-
-	// 3. Evaluate Match
-	if len(matchedGoalTopics) > 0 {
-		primaryGoalTopic := matchedGoalTopics[0]
-		goalTopicHits := topicHits[primaryGoalTopic.id]
-
-		// Clear topic mismatch:
-		// Another topic is dominant (e.g. Git with >= 3 hits) and the goal's topic has 0 hits
-		if topDocTopic.id != "" && topDocTopic.id != primaryGoalTopic.id && maxHits >= 2 && goalTopicHits == 0 {
-			return DocumentVerificationResult{
-				IsRelevant:       false,
-				RelevanceScore:   15.0,
-				IsSubstantial:    totalWords >= minWordsRequired,
-				SatisfiesGoal:    false,
-				ConfidenceRating: "HIGH",
-				Reasoning: fmt.Sprintf(
-					"Topic mismatch: Uploaded document covers %s (identified %d relevant keywords), but your commitment requires %s notes. Verification rejected.",
-					topDocTopic.name, maxHits, primaryGoalTopic.name,
-				),
-				DetectedTopic: topDocTopic.name,
-			}
-		}
-
-		// What if the goal topic has keywords present in the document?
-		if goalTopicHits >= 1 {
-			isSubstantial := totalWords >= minWordsRequired
-			return DocumentVerificationResult{
-				IsRelevant:       true,
-				RelevanceScore:   94.0,
-				IsSubstantial:    isSubstantial,
-				SatisfiesGoal:    isSubstantial,
-				ConfidenceRating: "HIGH",
-				Reasoning: fmt.Sprintf(
-					"Document verified: Successfully identified authentic %s concepts and notes matching your commitment.",
-					primaryGoalTopic.name,
-				),
-				DetectedTopic: primaryGoalTopic.name,
-			}
-		}
-
-		// Goal topic had 0 hits, but no other strong topic was detected
-		if goalTopicHits == 0 {
-			detected := "General / Unrelated"
-			if topDocTopic.id != "" && maxHits > 0 {
-				detected = topDocTopic.name
-			}
-			return DocumentVerificationResult{
-				IsRelevant:       false,
-				RelevanceScore:   20.0,
-				IsSubstantial:    totalWords >= minWordsRequired,
-				SatisfiesGoal:    false,
-				ConfidenceRating: "HIGH",
-				Reasoning: fmt.Sprintf(
-					"Content does not appear to contain %s material. Please ensure your notes clearly include %s concepts.",
-					primaryGoalTopic.name, primaryGoalTopic.name,
-				),
-				DetectedTopic: detected,
-			}
-		}
-	}
-
-	// If no specific tech topic was found in goal description (general goal):
-	detected := "General Technical Notes"
-	if topDocTopic.id != "" && maxHits >= 2 {
-		detected = topDocTopic.name
-	}
-
-	isSubstantial := totalWords >= minWordsRequired
-	return DocumentVerificationResult{
-		IsRelevant:       true,
-		RelevanceScore:   85.0,
-		IsSubstantial:    isSubstantial,
-		SatisfiesGoal:    isSubstantial,
-		ConfidenceRating: "HIGH",
-		Reasoning:        fmt.Sprintf("Document text verified (%d words). Content demonstrates substantive notes.", totalWords),
-		DetectedTopic:    detected,
-	}
-}
-
-func (c *GroqClient) VerifyDocumentContent(ctx context.Context, goalTitle, goalDesc string, targetPages int, extractedText string) (*DocumentVerificationResult, error) {
-	systemPrompt := `You are an expert AI Document Proof Auditor for PledgePay Escrow.
-A user has submitted written or scanned document proof (via PyMuPDF/Tesseract OCR) to fulfill an escrow commitment.
-
-CRITICAL TOPIC RELEVANCE CHECK:
-- Carefully compare the subject matter of the goal against the extracted document text.
-- If the goal requires notes on a specific topic (e.g. CSS notes) and the document is about a different topic (e.g. Git commands, Python, random text), you MUST mark:
-  "is_relevant": false,
-  "relevance_score": 15.0,
-  "satisfies_goal": false,
-  "detected_topic": "<the topic actually found in the document>",
-  "reasoning": "Topic mismatch: The document covers <detected_topic>, but the commitment requires <goal_topic>."
-
-Respond ONLY with valid JSON matching these keys:
-{
-  "is_relevant": boolean,
-  "relevance_score": float,
-  "is_substantial": boolean,
-  "satisfies_goal": boolean,
-  "confidence_rating": "HIGH" | "MEDIUM" | "LOW",
-  "reasoning": string,
-  "detected_topic": string
-}`
-
-	userPrompt := fmt.Sprintf("Goal Title: %s\nGoal Description: %s\nTarget Pages: %d\nExtracted Document Text (Sample):\n%s", goalTitle, goalDesc, targetPages, truncateText(extractedText, 4000))
-
-	var result DocumentVerificationResult
-	if err := c.Complete(ctx, systemPrompt, userPrompt, &result); err != nil {
-		res := AuditDocumentContentFallback(goalTitle, goalDesc, targetPages, extractedText)
-		return &res, nil
-	}
-
-	return &result, nil
 }

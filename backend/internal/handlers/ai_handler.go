@@ -101,10 +101,10 @@ Turn the user's natural language goal into a structured schema with measurable p
 Output JSON matching this exact schema:
 {
   "goal": "string (concise title summarizing the milestone)",
-  "target": integer (numerical target, default to 2 for notes/pages, 5 for DSA, 10 for commits),
+  "target": integer (numerical target, default to 5 for DSA, 5 for commits),
   "duration": integer (duration in days: minimum 1 day. If minutes or hours, set duration to 1),
-  "unit": "string ('pages' or 'words' for document/writing/notes, 'commits' or 'pull_requests' for code, 'problems' for DSA)",
-  "evidence": "string ('document_proof' for reading/writing/pages/books/notes/handwriting, 'codeforces_submissions' for DSA/problems, 'github_activity' for commits/PRs)",
+  "unit": "string ('commits' or 'pull_requests' for code, 'problems' for DSA)",
+  "evidence": "string ('codeforces_submissions' for DSA/problems, 'github_activity' for commits/PRs)",
   "timeframe_text": "string (e.g. '1 minute', '2 minutes', '1 day')",
   "duration_minutes": integer (number of minutes if specified, e.g. 1 or 2)
 }`
@@ -131,16 +131,6 @@ Output JSON matching this exact schema:
 				structured.TimeframeText = fmt.Sprintf("%d minutes", n)
 			}
 			structured.Duration = 1
-		}
-	}
-
-	if strings.Contains(lowerText, "note") || strings.Contains(lowerText, "page") || strings.Contains(lowerText, "upload") || strings.Contains(lowerText, "pdf") {
-		structured.Evidence = "document_proof"
-		if structured.Unit != "words" {
-			structured.Unit = "pages"
-		}
-		if structured.Target <= 0 {
-			structured.Target = 1
 		}
 	}
 
@@ -375,10 +365,10 @@ Output JSON:
   "duration_minutes": integer
 }
 RULES: 
-- unit MUST be 'pages' or 'words' for writing/reading/document/notes goals, 'problems' for DSA, 'commits' or 'pull_requests' for code.
-- evidence MUST be 'document_proof' for notes/writing/reading/books/handwritten documents/PDF uploads, 'codeforces_submissions' for DSA, 'github_activity' for commits/PRs.
-- if user specifies minutes like '1 minute', '2 minutes', 'mintest', set timeframe_text to e.g. '1 minute' or '2 minutes', duration_minutes to the number, and duration to 1.
-- target should default to 1 or 2 for notes/pages.`
+- unit MUST be 'problems' for DSA, 'commits' or 'pull_requests' for code/development.
+- evidence MUST be 'codeforces_submissions' for DSA/competitive programming, 'github_activity' for commits/PRs.
+- if user specifies minutes like '1 minute', '2 minutes', set timeframe_text to e.g. '1 minute', duration_minutes to the number, and duration to 1.
+- target should default to 5 for problems/commits.`
 		userPrompt := fmt.Sprintf("Goal: %s", req.Text)
 		return h.groqClient.Complete(gCtx, systemPrompt, userPrompt, &structured)
 	})
@@ -387,9 +377,9 @@ RULES:
 		systemPrompt := `You are the Commitment Quality Analyzer AI for PledgePay.
 Evaluate the commitment for specificity, measurability, realism, and verifiable evidence.
 CRITICAL RULES:
-1. Document Proof & Notes: When the user commits to completing/uploading notes, handwritten pages, or documents, Evidence is FULLY VERIFIABLE via Document Proof (PyMuPDF & Tesseract OCR). Evidence Score must be 95-100%. NEVER claim 'No verifiable evidence provided'!
+1. Automated Evidence: Commitments are verified via automated integrations: GitHub activity (commits, PRs) or Codeforces submissions (problems).
 2. Short Demo/Sprint Timeframes: If the user specifies short timeframes like 1 minute, 2 minutes, or 5 minutes for rapid live demo/testing, treat it as a valid rapid sprint commitment. Realism should be 90-95%, Overall 90-95%, and DO NOT complain about the timeframe!
-3. When goal has a clear topic and evidence source, give high ratings: Specificity 90-95%, Measurability 90-95%, Realism 90-95%, Evidence 90-95%, Overall 90-95%. Issues must be an empty list [].
+3. When goal has a clear target and evidence source, give high ratings: Specificity 90-95%, Measurability 90-95%, Realism 90-95%, Evidence 90-95%, Overall 90-95%. Issues must be an empty list [].
 Output JSON:
 {
   "specificity": integer (0-100), "measurability": integer (0-100), "realism": integer (0-100), "evidence": integer (0-100), "overall": integer (0-100),
@@ -474,63 +464,22 @@ Output JSON: {"suggestions": [{"charity_id": "string", "rationale": "string"}]}`
 			quality.SuggestedCommitment.TimeframeText = structured.TimeframeText
 		}
 	}
-
-	isNotesOrDoc := structured.Evidence == "document_proof" || strings.Contains(lowerText, "note") || strings.Contains(lowerText, "page") || strings.Contains(lowerText, "upload") || strings.Contains(lowerText, "pdf") || strings.Contains(lowerText, "hrml") || strings.Contains(lowerText, "html")
-
-	if isNotesOrDoc {
-		structured.Evidence = "document_proof"
-		if structured.Unit != "words" {
-			structured.Unit = "pages"
-		}
-		if structured.Target <= 0 {
-			structured.Target = 1
-		}
-
-		// Filter out any bogus complaints about lack of evidence, short demo timeframe, or vague descriptions
-		var cleanIssues []string
-		for _, iss := range quality.Issues {
-			lowerIss := strings.ToLower(iss)
-			if strings.Contains(lowerIss, "unrealistic") || strings.Contains(lowerIss, "evidence") || strings.Contains(lowerIss, "everything") || strings.Contains(lowerIss, "vague") || strings.Contains(lowerIss, "minute") {
-				continue
-			}
-			cleanIssues = append(cleanIssues, iss)
-		}
-		quality.Issues = cleanIssues
-
-		// Elevate score to high verifiability
-		if quality.Evidence < 85 {
-			quality.Evidence = 95
-		}
-		if quality.Realism < 85 {
-			quality.Realism = 92
-		}
-		if quality.Specificity < 85 {
-			quality.Specificity = 90
-		}
-		if quality.Measurability < 85 {
-			quality.Measurability = 95
-		}
-		if quality.Overall < 85 {
-			quality.Overall = 93
-		}
-	}
-
 	if structured.Target <= 0 {
-		structured.Target = 1
+		structured.Target = 5
 	}
 	if structured.Duration <= 0 {
 		structured.Duration = 1
 	}
 	if structured.Unit == "" {
-		if structured.Evidence == "document_proof" {
-			structured.Unit = "pages"
+		if structured.Evidence == "codeforces_submissions" {
+			structured.Unit = "problems"
 		} else {
 			structured.Unit = "commits"
 		}
 	}
 	if structured.Evidence == "" {
-		if structured.Unit == "pages" || structured.Unit == "words" {
-			structured.Evidence = "document_proof"
+		if structured.Unit == "problems" {
+			structured.Evidence = "codeforces_submissions"
 		} else {
 			structured.Evidence = "github_activity"
 		}

@@ -183,11 +183,6 @@ func (s *Server) setupRoutes() {
 					commGroup.POST("/:id/coach", coachHandler.AskCoach)
 				}
 
-				if evidenceRepo != nil {
-					documentHandler := handlers.NewDocumentHandler(commitmentRepo, evidenceRepo, groqClient)
-					commGroup.POST("/:id/upload-document", documentHandler.UploadDocumentProof)
-					commGroup.GET("/:id/document-proof", documentHandler.GetDocumentProof)
-				}
 
 				if resolver != nil {
 					resolutionHandler := handlers.NewResolutionHandler(resolver, commitmentRepo)
