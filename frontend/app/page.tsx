@@ -3,8 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
-import { apiClient, HealthResponse } from "@/lib/api-client";
 import { useAuth } from "@/hooks/use-auth";
 import { ArrowRight, Target, Heart, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -73,12 +71,6 @@ export default function Home() {
   const { isAuthenticated } = useAuth();
   const router = useRouter();
   const [goalText, setGoalText] = useState("");
-
-  const { data: health } = useQuery<HealthResponse>({
-    queryKey: ["health"],
-    queryFn: () => apiClient.getHealth(),
-    refetchInterval: 15000,
-  });
 
   const handleStartWithGoal = (e: React.FormEvent) => {
     e.preventDefault();
@@ -271,23 +263,6 @@ export default function Home() {
               </div>
             ))}
           </div>
-        </div>
-      </section>
-
-      <section className="w-full px-4 py-6 bg-[#16161A] text-white">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-[14px] font-body">
-          <div className="flex items-center gap-2.5">
-            <span
-              className="h-2.5 w-2.5 rounded-[12px] shrink-0"
-              style={{ backgroundColor: health?.status === "ok" ? "#00C896" : "#FF6B35" }}
-            />
-            <span className="text-white/80">
-              {health?.status === "ok" ? "Protocol status: All services operational" : "Protocol status: Degraded"}
-            </span>
-          </div>
-          <span className="text-white/50">
-            Automated verification via GitHub API &middot; Settled on Razorpay Escrow
-          </span>
         </div>
       </section>
     </div>
